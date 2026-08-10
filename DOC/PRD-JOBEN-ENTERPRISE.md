@@ -5,7 +5,7 @@
 **Kategori:** Compliance Automation & Trust Management Platform  
 **Domain target:** `jobenapp.cloud`  
 **Dokumen kanonik:** `/DOC/PRD-JOBEN-ENTERPRISE.md`  
-**Versi:** 5.3 — Global-Ready Core, Indonesia/Asia MVP Contract
+**Versi:** 5.4 — Control Graph & Policy-as-Code Contract
 **Status:** Baseline engineering; implementasi hanya boleh mengklaim capability yang telah melewati gate pada §24
 **Bahasa dokumen:** Bahasa Indonesia; istilah standar teknis dan compliance mengikuti istilah resmi  
 **Strategi go-to-market:** Core system global-ready by design; MVP pertama diluncurkan untuk Indonesia/Asia
@@ -42,6 +42,7 @@ engineering yang harus ditutup:
 | Tenant isolation hanya dijelaskan sebagai tanggung jawab service | Satu query lupa filter dapat menjadi IDOR | Authorization policy terpusat, scoped repository, negative tests, dan RLS bila tersedia |
 | Backup, restore, migration, incident response belum menjadi release gate | Sistem bisa jalan tetapi tidak dapat dipulihkan | RTO/RPO, restore drill, migration rollback, SLO, dan runbook wajib |
 | MVP mencakup terlalu banyak permukaan sekaligus | Scope besar menghambat validasi kebenaran | Satu vertical slice AWS read-only harus benar sebelum provider kedua; global-readiness dibangun sebagai fondasi, bukan perluasan fitur MVP |
+| Relasi control, framework, policy, check, finding, evidence, dan remediation tersebar sebagai mapping statis | Dampak perubahan tidak dapat ditelusuri; policy dapat dievaluasi pada graph yang salah atau stale | Control Graph versioned dengan typed edge, snapshot hash, lineage, dan Policy-as-Code evaluator deterministik dengan approval, simulation, dan rollback |
 
 ### 0.1 Aturan build yang mengikat
 
@@ -74,6 +75,19 @@ engineering yang harus ditutup:
 - **Finding:** hasil evaluation untuk resource/scope tertentu yang terhubung ke evidence.
 - **Control status:** agregasi finding terbaru yang relevan dengan coverage dan
   data quality; bukan field yang boleh diubah dari UI.
+- **Control Graph:** graph bertipe dan berversi yang menghubungkan framework,
+  requirement, control, policy, check, resource, observed fact, finding,
+  evidence, remediation, exception, dan owner dalam satu scope yang dapat
+  ditelusuri. Graph adalah source of truth untuk relasi dan lineage, bukan
+  pengganti evidence atau status control.
+- **Policy-as-Code:** policy deklaratif versioned yang dikompilasi/di-evaluate
+  oleh evaluator deterministik terhadap input snapshot yang immutable. Policy
+  tidak boleh memanggil network, clock, random, AI, atau menulis source of truth
+  lain; hasil `unknown`, error, stale, dan incomplete bukan `pass`.
+- **Policy bundle:** unit publishable yang berisi source policy, dependency,
+  input schema, output contract, test vector, evaluator version, metadata
+  provenance, dan hash. Bundle yang belum approved/published tidak dapat
+  memengaruhi status customer.
 - **Readiness score:** metrik internal berbasis scope dan freshness; bukan opini
   auditor, sertifikasi, atau jaminan lulus.
 
@@ -249,6 +263,9 @@ MFA wajib untuk akun internal dan role `OWNER`/`ADMIN` melalui Clerk.
   berstatus `live_verified`.
 - Fase 1: satu vertical slice AWS cross-account IAM role, scan engine, evidence
   vault, control aggregator, dashboard, control detail, dan remediation.
+- Control Graph dan Policy-as-Code disiapkan sebagai capability terkontrak sejak
+  vertical slice; hanya graph/policy yang memiliki proof record boleh digunakan,
+  dan status awalnya tetap `planned`/`verification_required`.
 - Fase 1B: provider GitHub App, PDF, notification, billing sandbox, dan AI
   gateway hanya setelah safety/contract gate lulus.
 - Google Workspace, public trust page, auditor portal, dan fitur regulasi tidak
@@ -312,7 +329,7 @@ Sebuah modul dinyatakan `completed` hanya jika:
 8. `CapabilityRecord` memiliki proof record, tanggal verifikasi, expiry, serta
    reviewer yang berbeda dari author untuk capability berisiko tinggi.
 
-Kriteria ini berlaku untuk scan, evidence, control, policy, risk, vendor,
+ Kriteria ini berlaku untuk scan, evidence, control, graph, policy-as-code, risk, vendor,
 regulation, report, trust/auditor, notification, billing, AI, auth, dan
 operations. CRUD generik bukan definisi kelengkapan; state machine dan hasil
 bisnis yang dapat diverifikasi adalah definisinya.
@@ -342,6 +359,7 @@ juga `live_verified`.
 | M-13 | Billing & Entitlement | plan catalog, checkout, webhook inbox, subscription state, entitlement enforcement, reconciliation | `planned` | M-01, payment provider, audit |
 | M-14 | AI Gateway & Assistants | scoped retrieval, citations, refusal, schema validation, human approval, usage/cost control | `planned` | M-01, M-05, M-06, AI provider |
 | M-15 | Admin, Observability & Operations | capability registry, incidents, queues, SLO, cost, backup/restore, runbooks, release control | `planned` | all production dependencies |
+| M-16 | Control Graph & Policy-as-Code | typed control lineage, versioned graph snapshots, policy bundle lifecycle, deterministic evaluation, simulation, exceptions, impact analysis, audit | `planned` | M-01, M-05, M-06, M-11, M-15 |
 
 Status `planned` pada tabel ini adalah status repository saat PRD ditulis, bukan
 klaim bahwa modul sudah tersedia. Setiap implementasi wajib memecah modul menjadi
@@ -353,7 +371,7 @@ operational evidence, reviewer, dan expiry. Mengubah status modul menjadi
 
 Setiap modul utama wajib memiliki dokumen kontrak tersendiri sebelum coding dan
 dossier completion sebelum release. Kontrak tidak boleh hanya menjelaskan UI.
-Minimum isi dan perilaku berikut berlaku untuk seluruh M-01 sampai M-15:
+Minimum isi dan perilaku berikut berlaku untuk seluruh M-01 sampai M-16:
 
 1. **Boundary dan ownership:** tujuan, non-goals, owner, aktor, role matrix,
    tenant scope, data classification, source of truth, dependency, dan public
@@ -508,6 +526,53 @@ Minimum isi dan perilaku berikut berlaku untuk seluruh M-01 sampai M-15:
   checksum/migration/tenant/evidence reference tanpa mengubah histori; critical
   alert, audit, backup/restore, dan runbook drill memiliki bukti timestamp.
 
+#### M-16 — Control Graph & Policy-as-Code
+
+- **Boundary dan non-goals:** M-16 memiliki source of truth untuk relasi control,
+  policy, check, resource, evidence, finding, remediation, exception, framework,
+  dan owner. M-16 tidak mengumpulkan evidence, tidak menggantikan evaluator
+  provider, tidak memberi sertifikasi, dan tidak mengizinkan policy menulis
+  langsung ke `Finding`, `Evidence`, `OrgControlStatus`, atau data provider.
+- **Graph contract:** graph terdiri dari node dan typed edge yang versioned,
+  tenant-scoped, framework-aware, dan dapat direbuild. Setiap edge memiliki
+  `edgeType`, `sourceNodeId`, `targetNodeId`, `validFrom`, optional `validTo`,
+  `provenanceRef`, dan `edgeVersion`. Snapshot yang dipublish immutable dan
+  content-addressed; perubahan menghasilkan snapshot baru, bukan mutasi histori.
+- **Policy contract:** policy bundle memiliki source, language/runtime version,
+  input schema, output schema, dependency list, target node/control, evaluator
+  version, test vectors, provenance, content hash, owner, dan expiry. Evaluasi
+  hanya membaca input snapshot yang immutable; network, clock, random, AI,
+  credential, dan side effect dilarang. Bahasa policy dan runtime final wajib
+  ditetapkan melalui RFC sebelum implementasi.
+- **Alur wajib:** create graph/policy draft → validate schema/semantics/security →
+  lint/compile → run test vectors → simulate terhadap graph/evidence snapshot →
+  review → approve → publish atomically → evaluate queued/running/completed →
+  inspect lineage/impact → supersede/withdraw/rollback.
+- **State wajib:** graph snapshot `draft`, `validating`, `published`, `superseded`,
+  `archived`; policy bundle `draft`, `lint_failed`, `tested`, `in_review`,
+  `approved`, `published`, `superseded`, `withdrawn`; evaluation `queued`,
+  `running`, `completed`, `partial`, `unknown`, `error`, `cancelled`; simulation
+  `requested`, `running`, `completed`, `failed`, `expired`.
+- **Evaluation semantics:** result per target resource adalah `pass`, `fail`,
+  `error`, `unknown`, atau `not_applicable`. `unknown`, missing input, stale/
+  expired evidence, graph inconsistency, policy dependency failure, timeout, dan
+  schema mismatch tidak pernah dikonversi menjadi `pass` atau menaikkan score.
+  Setiap result menyimpan policy/version, graph snapshot hash, input snapshot
+  hash, target resource, evidence/finding references, observed/evaluated time,
+  coverage, data quality, explanation code, dan deterministic message.
+- **Exceptions:** exception terpisah dari finding dan evaluation, selalu memiliki
+  scope, justification, owner, approver berbeda, start/expiry, compensating
+  control bila relevan, dan audit. Exception tidak menghapus atau mengubah
+  finding/evidence; customer-facing projection harus tetap menampilkan raw
+  failure dan status exception secara jelas.
+- **Acceptance:** graph validator menolak dangling edge, duplicate identity,
+  cross-tenant reference, invalid edge type, incompatible framework mapping,
+  dependency cycle, dan snapshot hash mismatch; policy evaluator menghasilkan
+  output identik untuk input/version yang sama; simulation tidak memiliki side
+  effect; publish/revoke/rollback idempotent dan atomic; perubahan node/edge/
+  policy dapat menunjukkan impacted controls, findings, reports, notifications,
+  dan remediation; replay tidak menggandakan evaluation atau audit event.
+
 ### 4.8 Kontrak delivery core system
 
 Bagian ini menerjemahkan “real work, completed, full feature” menjadi kontrak
@@ -519,7 +584,7 @@ role yang berwenang tanpa SQL manual atau perubahan data langsung.
 
 #### 4.8.1 Definisi completion yang mengikat
 
-Setiap modul M-01 sampai M-15 wajib memiliki satu atau lebih
+Setiap modul M-01 sampai M-16 wajib memiliki satu atau lebih
 `CapabilityRecord` dengan status terpisah. Capability yang belum siap tidak boleh
 menahan modul lain secara diam-diam dan tidak boleh ikut menghasilkan status
 customer-facing. Sebuah modul hanya boleh diberi label internal `completed` bila
@@ -563,6 +628,7 @@ sesuai §6.4; hasil lama tidak boleh dipromosikan menjadi selesai.
 | M-13 Billing & Entitlement | Catalog version, checkout, signature-verified inbox, subscription state machine, entitlement enforcement, renewal/failure/cancel/refund, reconciliation | Provider webhook inbox + subscription ledger; entitlement projection server-side | replay/out-of-order webhook, signature failure, payment mismatch, grace-period ambiguity, unauthorized feature access |
 | M-14 AI Gateway & Assistants | Scoped retrieval, redaction, model routing, schema/citation verification, refusal, human approval, usage/cost budget, deletion | Retrieval/evidence source dan `AiUsageLog`; AI tidak memiliki compliance write authority | prompt injection, insufficient evidence, invalid citation, cross-tenant retrieval, unsafe fallback, budget exceeded, provider outage |
 | M-15 Admin, Observability & Operations | Capability registry, release diff, queue controls, incidents, SLO/cost, backup/restore, checksum, migration, runbook, emergency disable | Operational ledger, telemetry, backup manifest, incident record; tidak mengubah business history | alert loss, restore mismatch, checksum failure, migration failure, runaway cost, missing audit, unsafe operator action |
+| M-16 Control Graph & Policy-as-Code | Graph node/edge versioning, lineage, policy bundle authoring/validation, lint/compile, test vectors, simulation, approval/publish, deterministic evaluation, impact analysis, exception, supersede/withdraw/rollback | Versioned graph snapshot dan approved policy bundle; evaluation ledger append-only; control/finding/evidence tetap dimiliki M-06/M-05 | dangling/cross-tenant edge, cycle, schema/runtime drift, unknown input, stale evidence, policy timeout, dependency failure, unauthorized publish, rollback mismatch |
 
 M-02 dan M-04, serta pasangan lain yang ditulis bersama di tabel readiness,
 tetap wajib memiliki dossier dan `CapabilityRecord` terpisah. Pengelompokan hanya
@@ -571,7 +637,10 @@ untuk urutan pembahasan, bukan alasan untuk melewati gate salah satu modul.
 #### 4.8.3 Dossier completion wajib
 
 Sebelum modul atau capability berubah ke `live_verified`, repository harus
-memiliki `DOC/completion/<moduleId>/` dengan isi minimal:
+memiliki `DOC/completion/<moduleId>/` dengan isi minimal. Untuk M-16,
+`contract.md` juga wajib menetapkan grammar/runtime policy, graph schema dan
+edge registry, input/output schema, determinism contract, simulation isolation,
+serta exception dan rollback rules:
 
 ```text
 README.md                  # scope, non-goals, owner, limitation, dependency
@@ -1150,6 +1219,162 @@ menyimpan snapshot lama, dan tidak mengedit histori.
 Dashboard selalu menampilkan timestamp “Data per” untuk setiap integration dan
 framework, serta timezone.
 
+### 8.4 Control Graph dan Policy-as-Code
+
+#### 8.4.1 Graph model dan invariant
+
+Control Graph menjadi canonical relationship layer untuk menjawab “mengapa
+status ini muncul?” dan “apa yang terdampak bila relasi atau policy berubah?”.
+Graph tidak menyimpan raw evidence sebagai node payload; graph hanya menyimpan
+reference, metadata yang telah diklasifikasikan, dan provenance.
+
+Node minimum:
+
+```text
+framework, requirement, control, policy, check, resource,
+observed_fact, finding, evidence, remediation, exception, owner
+```
+
+Edge type minimum:
+
+```text
+framework_contains_requirement
+requirement_implemented_by_control
+control_governed_by_policy
+policy_evaluates_check
+check_observes_resource
+resource_produces_observed_fact
+observed_fact_supported_by_evidence
+evidence_supports_finding
+finding_maps_to_control
+finding_has_remediation
+control_owned_by_owner
+control_has_exception
+```
+
+Aturan graph:
+
+1. Node key stabil dan edge type adalah vocabulary versioned; arbitrary edge
+   type dari client ditolak.
+2. Setiap node/edge harus memiliki tenant scope atau secara eksplisit
+   `global_catalog` yang read-only dan direferensikan dengan versi.
+3. Snapshot harus merupakan graph yang valid secara struktural dan semantik:
+   tidak boleh ada dangling reference, duplicate identity, invalid direction,
+   edge type yang tidak sesuai pasangan node, cycle pada dependency yang
+   seharusnya acyclic, atau framework mapping yang tidak kompatibel.
+4. Semua edge yang berasal dari provider, framework resmi, atau keputusan
+   customer memiliki `provenanceRef`; tanpa provenance edge tetap `draft` dan
+   tidak eligible untuk publish.
+5. Snapshot hash dihitung dari canonical node/edge ordering, schema version,
+   catalog version, dan source references. Snapshot yang sama menghasilkan hash
+   yang sama pada rebuild.
+6. Read path wajib dapat menelusuri sekurang-kurangnya:
+   `control → policy → check → resource → observed fact → evidence → finding →
+   remediation`. Node yang hilang membuat lineage `incomplete`, bukan
+   menghilangkan status atau membuat status terlihat lebih baik.
+
+#### 8.4.2 Policy language dan evaluator contract
+
+Policy-as-Code harus deklaratif, deterministic, sandboxed, dan versioned. PRD
+tidak mengunci vendor/runtime tertentu sebelum RFC membandingkan:
+ 1. grammar dan type system;
+ 2. sandbox/isolation serta resource limits;
+ 3. schema validation dan backward compatibility;
+ 4. testability, explainability, dan tooling;
+ 5. license, maintenance, security advisories, dan total cost.
+
+RFC tersebut wajib memilih satu language/runtime untuk fase implementasi dan
+menetapkan migration/rollback plan. Sebelum RFC disetujui, M-16 tetap
+`verification_required` dan tidak boleh dievaluasi pada customer data.
+
+Input evaluator minimal:
+
+```text
+policyBundleVersion
+graphSnapshotHash
+organizationId
+targetScope
+observedFacts[]
+evidenceMetadata[]
+findingReferences[]
+evaluationTime
+```
+
+`evaluationTime` adalah nilai yang diberikan oleh orchestrator dan disimpan
+untuk reproducibility; policy tidak boleh membaca system clock sendiri. Output
+minimal:
+
+```text
+result: pass | fail | error | unknown | not_applicable
+resourceKey
+explanationCode
+deterministicMessage
+requiredInputs[]
+evidenceRefs[]
+findingRefs[]
+coverage
+dataQuality
+policyVersion
+graphSnapshotHash
+inputSnapshotHash
+evaluatorVersion
+```
+
+Evaluator wajib:
+
+- menolak input schema/runtime yang tidak cocok sebelum menjalankan policy;
+- membatasi CPU, memory, output size, recursion/dependency depth, dan execution
+  time; limit breach menjadi `error`/`unknown` sesuai taxonomy, bukan pass;
+- mengurutkan collection dan hasil secara canonical agar output tidak bergantung
+  pada iteration order;
+- mengembalikan `requiredInputs` untuk `unknown`, tanpa menebak nilai yang
+  hilang;
+- memverifikasi seluruh evidence reference sebelum hasil masuk projection;
+- menolak policy yang melakukan network, filesystem di luar sandbox, dynamic
+  code loading, credential access, side effect, nondeterministic function,
+  atau AI/model call;
+- menyimpan input/output hash dan evaluator version sehingga hasil dapat
+  direbuild dan dibandingkan.
+
+#### 8.4.3 Lifecycle, approval, simulation, dan impact
+
+Author dapat membuat draft graph/policy hanya pada organization scope yang
+diizinkan. Lint, compile, static security check, dependency resolution, dan
+test vector wajib lulus sebelum status `tested`. Reviewer tidak boleh sama
+sebagai author untuk publish production policy atau graph yang mengubah
+customer-facing status.
+
+Simulation wajib memakai graph snapshot dan evidence/input snapshot yang
+immutable, diberi label `simulation`, dan tidak boleh:
+
+- menulis `Finding`, `OrgControlStatus`, score, remediation, notification,
+  report eligibility, atau Trust Publication;
+- mengubah effective policy atau graph;
+- memanggil provider, network, credential, atau external side effect.
+
+Simulation output harus menunjukkan before/after untuk target yang sama,
+perubahan result/status, changed controls, required inputs, dan limitation.
+Hasil simulation kedaluwarsa bila graph, policy, evaluator, atau input snapshot
+yang dirujuk berubah.
+
+Publish adalah atomic activation terhadap satu pasangan graph snapshot dan
+policy bundle version. Publish harus:
+
+1. memastikan seluruh dependency berstatus eligible dan belum expired;
+2. menyimpan approval, actor, reason, effectiveAt, hash, dan capability diff;
+3. membuat impact record untuk control/finding/remediation/report/notification
+   yang terdampak;
+4. mengantre evaluation baru bila policy effective;
+5. mempertahankan hasil lama sebagai histori, tanpa retroactive rewrite;
+6. dapat di-withdraw atau di-rollback ke pasangan versi sebelumnya yang proof-nya
+   masih valid. Jika rollback proof expired atau dependency gagal, status menjadi
+   `verification_required`, bukan otomatis live.
+
+Exception hanya dapat menurunkan dampak operasional sesuai policy yang disetujui;
+exception tidak pernah mengubah raw evaluation result dan tidak dapat
+memperpanjang dirinya sendiri. Expiry job dan notification wajib memastikan
+exception yang expired kembali terlihat sebagai gap.
+
 ---
 
 ## 9. Evidence, Remediation, dan Report
@@ -1322,6 +1547,28 @@ Policy / Risk / Vendor / RegulationUpdate
   organizationId, entityType, status, version, sourceRef, sourceHash,
   effectiveAt, reviewDueAt, approvedBy, approvedAt, publishedAt, supersededAt
 
+ControlGraphNode / ControlGraphEdge / ControlGraphSnapshot
+  organizationId, graphId, snapshotVersion, nodeType, nodeKey, metadata,
+  edgeType, sourceNodeId, targetNodeId, validFrom, validTo, provenanceRef,
+  contentHash, status, createdBy, approvedBy, publishedAt, supersededAt
+
+PolicyBundle / PolicyDependency / PolicyTestVector
+  organizationId, bundleKey, version, language, runtimeVersion, sourceRef,
+  inputSchemaVersion, outputSchemaVersion, dependencyRefs, targetNodeRefs,
+  evaluatorVersion, testVectorRef, contentHash, status, owner, expiresAt,
+  approvedBy, approvedAt, publishedAt, supersededAt, withdrawnAt
+
+PolicySimulation / PolicyEvaluation / PolicyEvaluationResult
+  organizationId, graphSnapshotId, policyBundleId, inputSnapshotHash,
+  status, requestedBy, idempotencyKey, startedAt, finishedAt, coverage,
+  dataQuality, targetResourceKey, result, explanationCode, deterministicMessage,
+  evidenceRefs, findingRefs, observedAt, evaluatedAt, errorCode
+
+ControlException / PolicyImpactRecord
+  organizationId, targetNodeId, targetResourceKey, justification, owner,
+  approver, compensatingControlRef, startsAt, expiresAt, status, auditRef,
+  changedEntityRef, impactedEntityType, impactedEntityId, impactReason
+
 TrustPublication / AuditorAccess
   organizationId, status, scope, capabilitySnapshot, evidenceSnapshot,
   tokenRef, expiresAt, revokedAt, publishedBy, createdAt
@@ -1368,6 +1615,22 @@ Constraint wajib:
 - `ObservedFact` tidak dapat dibuat tanpa evidence yang hash-valid.
 - `ControlStatus` adalah projection yang dapat direbuild dari finding append-only;
   ia bukan source of truth.
+- `ControlGraphSnapshot`, `PolicyBundle`, dan `PolicyEvaluation` menyimpan
+  organization scope langsung; node/edge lintas organisasi atau namespace demo/
+  live ditolak sebelum publish.
+- Graph snapshot, policy bundle, test vector, simulation input, dan evaluation
+  result yang telah dipublish/committed immutable. Koreksi membuat versi baru
+  dengan `supersedes`/lineage reference; histori tidak di-update atau dihapus.
+- `contentHash` dihitung dari canonical bytes yang mencakup schema/runtime
+  version. Hash graph, policy, input snapshot, dan output harus dapat diverifikasi
+  ulang sebelum evaluation atau report memakai hasilnya.
+- Policy evaluation hanya dapat membaca `Evidence`, `ObservedFact`, `Finding`,
+  `Control`, dan graph snapshot melalui scoped read service. Ia tidak boleh
+  menulis entity tersebut, mengakses credential, atau memanggil provider/network.
+- Exception tidak mengubah finding/evidence dan tidak menghapus node/edge.
+  Exception expired atau revoked otomatis tidak eligible untuk projection
+  customer-facing; setiap override score/status membutuhkan rule dan audit yang
+  eksplisit.
 - `publishedAt` policy AI tetap null sampai approval.
 - `humanApproved` questionnaire wajib true sebelum export/send.
 - State ledger untuk subscription, report, notification, auditor access, incident,
@@ -1405,6 +1668,7 @@ menulis actor, reason, version, `correlationId`, dan timestamp UTC.
 | M-13 | subscription `pending → active → past_due/grace → cancelled/expired`; payment event `received → verified → applied/reconciled/rejected` | subscription `active/cancelled/expired`; event `reconciled/rejected` | signature, ordering policy, provider reference, entitlement projection |
 | M-14 | request `received → retrieving → generating → validating → answered/refused/failed`; draft `draft → approved/rejected` | request answered/refused/failed; draft approved/rejected | scoped retrieval, citation verification, safety schema, budget, human approval |
 | M-15 | incident `detected → acknowledged → contained → recovering → resolved → reviewed`; release `candidate → blocked/approved → deployed → rolled_back` | incident `reviewed`; release `deployed/rolled_back` | severity owner, evidence timeline, approval separation, rollback proof |
+| M-16 | graph `draft → validating → published → superseded/archived`; bundle `draft → lint_failed/tested → in_review → approved → published → superseded/withdrawn`; evaluation `queued → running → completed/partial/unknown/error/cancelled`; simulation `requested → running → completed/failed/expired` | graph/bundle published, evaluation terminal, simulation terminal | schema/semantic/security validation, graph hash, test vectors, reviewer separation, input freshness, evaluator version, idempotency, expiry, rollback |
 
 Tidak boleh ada transition langsung dari state input ke state sukses hanya karena
 request HTTP berhasil. `202 Accepted` berarti command diterima/queued; state
@@ -1434,6 +1698,10 @@ restricted; consumer mengambil data melalui scoped service.
 | `TrustPublished`, `AuditorAccessRevoked` | M-12 → M-08/M-15 | publikasi harus menyimpan eligibility snapshot dan expiry |
 | `SubscriptionChanged`, `EntitlementChanged` | M-13 → M-08/M-15 | entitlement hanya membatasi capability; tidak dapat menulis scan truth |
 | `AiAnswerProduced`, `AiRefused`, `AiDraftApproved` | M-14 → M-08/M-11/M-15 | output AI tidak menulis compliance truth; citation/safety result tersimpan |
+| `ControlGraphPublished`, `ControlGraphSuperseded` | M-16 → M-06/M-08/M-09/M-11/M-15 | snapshot hash dan eligibility tersimpan; consumer tidak memakai graph yang withdrawn/expired |
+| `PolicyBundleApproved`, `PolicyBundlePublished`, `PolicyBundleWithdrawn` | M-16 → M-06/M-08/M-11/M-15 | hanya approved bundle dapat publish; withdrawn bundle tidak dievaluasi untuk status baru |
+| `PolicySimulationCompleted`, `PolicyEvaluationCompleted`, `PolicyEvaluationUnknown` | M-16 → M-06/M-07/M-08/M-09/M-10/M-15 | simulation tanpa side effect; evaluation lineage lengkap; unknown/error tidak menjadi pass |
+| `ControlExceptionGranted`, `ControlExceptionExpired`, `PolicyImpactRecorded` | M-16 → M-06/M-07/M-08/M-09/M-10/M-15 | exception scoped/time-bound; impact record dapat diaudit; raw finding tetap terlihat |
 | `IncidentOpened`, `IncidentResolved`, `ReleaseApproved`, `ReleaseRolledBack` | M-15 → audit/operational consumers | incident closure membutuhkan corrective action dan timeline |
 
 Consumer wajib idempotent berdasarkan `eventId`, menyimpan offset/processing
@@ -1475,8 +1743,31 @@ Endpoint minimum:
 | `POST` | `/api/organizations/invitations/{id}/revoke` | mencabut invitation |
 | `POST` | `/api/organizations/members/{id}/transition` | suspend/revoke/role change |
 | `GET` | `/api/capabilities` | capability status dan limitation yang boleh dilihat |
+| `GET` | `/api/control-graph` | graph snapshot aktif dan metadata lineage sesuai scope |
+| `GET` | `/api/control-graph/{snapshotId}` | node, edge, provenance, hash, dan validation status |
+| `POST` | `/api/control-graph/drafts` | membuat draft graph atau perubahan graph |
+| `POST` | `/api/control-graph/{draftId}/validate` | validasi schema, edge, cycle, tenant, provenance, dan semantic mapping |
+| `POST` | `/api/control-graph/{draftId}/simulate` | simulasi perubahan terhadap immutable input snapshot |
+| `POST` | `/api/control-graph/{draftId}/review` | submit/reject review graph |
+| `POST` | `/api/control-graph/{draftId}/publish` | publish atomic graph snapshot setelah approval |
+| `POST` | `/api/control-graph/{snapshotId}/withdraw` | withdraw graph snapshot dan membuat impact record |
+| `GET` | `/api/policies` | daftar policy bundle tenant dengan version/status/expiry |
+| `GET` | `/api/policies/{bundleId}` | source metadata, schema, dependency, test result, dan lineage |
+| `POST` | `/api/policies/drafts` | membuat policy bundle draft |
+| `POST` | `/api/policies/{bundleId}/validate` | lint, compile, static security check, dan dependency validation |
+| `POST` | `/api/policies/{bundleId}/test` | menjalankan test vectors deterministik |
+| `POST` | `/api/policies/{bundleId}/simulate` | evaluasi dry-run terhadap graph/input snapshot |
+| `POST` | `/api/policies/{bundleId}/review` | submit/approve/reject policy review |
+| `POST` | `/api/policies/{bundleId}/publish` | publish bundle dengan graph snapshot yang eksplisit |
+| `POST` | `/api/policies/{bundleId}/withdraw` | withdraw policy dan menghentikan evaluation baru |
+| `GET` | `/api/policy-evaluations/{id}` | status, result, lineage, coverage, explanation, dan error |
+| `POST` | `/api/control-exceptions` | mengajukan exception scoped dengan expiry dan justification |
+| `POST` | `/api/control-exceptions/{id}/review` | approve/reject/revoke exception |
+| `GET` | `/api/policy-impacts/{id}` | daftar entity terdampak dan alasan perubahan |
 | `POST` | `/api/internal/jobs/scan-runner` | drain scan queue |
 | `POST` | `/api/internal/jobs/evidence-verify` | verifikasi hash/object/retention |
+| `POST` | `/api/internal/jobs/policy-evaluation` | drain evaluation queue dengan lease dan dead-letter |
+| `POST` | `/api/internal/jobs/exception-expiry` | expire exception dan emit notification/audit |
 | `POST` | `/api/internal/jobs/notification-retry` | drain notification retry/dead-letter |
 | `POST` | `/api/internal/jobs/backup-verify` | verifikasi backup manifest dan restore sample |
 | `POST` | `/api/internal/jobs/regulation-monitor` | fetch perubahan regulasi |
@@ -1511,6 +1802,21 @@ Internal job:
   tidak menghapus evidence historis.
 - `scan` membuat satu `ScanRun` atau mengembalikan run aktif yang sama. HTTP 202
   berarti queued, bukan sukses; client harus membaca progress dan final status.
+- Semua endpoint M-16 mengembalikan `graphSnapshotHash`, `policyBundleVersion`,
+  `evaluatorVersion`, `inputSnapshotHash`, `capabilityStatus`, dan
+  `correlationId` bila konteksnya relevan. Hash/version yang tidak cocok
+  menghasilkan `conflict` atau `verification_required`, bukan evaluasi baru.
+- Draft, validate, test, simulate, review, publish, withdraw, dan exception
+  mutation wajib memakai `Idempotency-Key` serta optimistic concurrency.
+  Publish hanya menerima pasangan graph/policy yang eksplisit; server menolak
+  target state arbitrer atau publish dari draft yang belum approved.
+- `simulate` selalu mengembalikan `simulationId` dan `202 Accepted` bila queued.
+  Simulation result harus ditandai non-production dan tidak boleh muncul pada
+  control score, report, notification, atau Trust Publication.
+- Policy source tidak boleh dikembalikan kepada role yang tidak memiliki
+  permission; endpoint read hanya mengembalikan metadata/redacted source sesuai
+  classification. Exception approval memerlukan reviewer yang berbeda dari
+  author/owner dan menyimpan expiry.
 - Transition endpoint hanya menerima command yang diizinkan oleh state machine;
   client tidak boleh mengirim target state arbitrer. Response wajib mengembalikan
   state baru, transition version, audit reference, dan correlation ID.
@@ -1582,6 +1888,28 @@ Jangan menggunakan palet biru/ungu sebagai identitas utama.
 - Tampilkan `error`/`needs_review` berbeda visual dari fail.
 - Evidence hash dan timestamp dapat dibuka auditor.
 
+**Control Graph & Policy Center**
+
+- Graph view memiliki filter framework, control, policy, provider, resource,
+  owner, status, dan version; node/edge menampilkan type, scope, provenance,
+  freshness, capability status, serta snapshot hash.
+- Control detail menyediakan lineage path yang dapat diekspor:
+  `control → policy → check → resource → observed fact → evidence → finding →
+  remediation`, termasuk node/edge yang missing atau stale.
+- Policy editor hanya tersedia untuk role yang diizinkan dan menampilkan
+  language/runtime version, input/output schema, dependency, test vector,
+  last validation, reviewer, effective/expiry time, serta limitation.
+- Policy workflow memisahkan `draft`, `validate`, `test`, `simulate`, `review`,
+  `approve`, `publish`, `withdraw`, dan `rollback`. Tombol publish disabled
+  untuk bundle yang belum approved, expired, dependency-failed, atau capability
+  `verification_required`.
+- Simulation view selalu memiliki banner “Simulation — tidak memengaruhi status
+  live”, menampilkan before/after, changed controls, required inputs,
+  unknown/error, impact count, graph/policy/input hash, dan waktu observasi.
+- Exception panel menampilkan raw finding, justification, approver, scope,
+  compensating control, expiry countdown, serta riwayat revoke/expiry; exception
+  tidak boleh menyembunyikan finding.
+
 **Evidence Vault**
 
 - Filter provider/control/date/type.
@@ -1597,6 +1925,14 @@ Setiap layar yang bergantung scan memiliki state eksplisit:
 
 CTA: “Hubungkan Integrasi Pertama Anda”. Tidak boleh ada grid kosong atau skor
 default.
+
+Control Graph/Policy-as-Code wajib memiliki state UI terpisah untuk
+`not_available`, `draft`, `validating`, `lint_failed`, `in_review`, `approved`,
+`published`, `superseded`, `withdrawn`, `queued`, `running`, `partial`,
+`unknown`, `error`, `stale`, `expired`, `degraded`, dan `forbidden`. State
+tersebut harus menyebutkan snapshot/version/hash, alasan blokir, umur input,
+scope, serta CTA pemulihan yang diizinkan; simulation dan demo tidak boleh
+terlihat sebagai live status.
 
 ### 12.3 i18n
 
@@ -1937,12 +2273,22 @@ cross-region isolation test, dan independent reviewer sign-off.
 
 - Unit test untuk setiap evaluator check, aggregator, scorer, redactor, permission
   mapper, dan remediation template.
+- Unit/property test untuk canonical graph serialization, node/edge validator,
+  dependency-cycle detection, policy parser/type checker, evaluator purity,
+  deterministic ordering, resource limits, and result explanation.
 - Integration test untuk Prisma tenant scoping, evidence writer, provider client,
   queue idempotency, webhook signature.
+- Integration test untuk graph snapshot persistence, immutable hash verification,
+  policy bundle lifecycle, approval separation, simulation isolation, atomic
+  publish/withdraw, impact record, exception expiry, and evaluation ledger.
 - Contract test terhadap mock/provider sandbox dengan response fixture resmi.
 - End-to-end test onboarding dan remediation.
+- E2E test graph/policy authoring oleh role yang diizinkan, deny case untuk
+  unauthorized/cross-tenant, review/publish/rollback, lineage inspection,
+  simulation non-interference, and customer projection visibility.
 - Security test untuk IDOR, cross-tenant access, secret leakage, replay webhook,
-  privilege escalation.
+  privilege escalation, sandbox escape, policy injection, resource exhaustion,
+  unsafe dynamic loading, and graph namespace confusion.
 - Manual verification terhadap cloud sandbox nyata.
 
 ### 17.2 Test wajib scan
@@ -1959,7 +2305,41 @@ cross-region isolation test, dan independent reviewer sign-off.
 9. Demo mode selalu menampilkan badge dan tidak bisa mengakses live endpoint.
 10. PDF dapat dibuka pada dua reader dan evidence hash dapat diverifikasi.
 
-### 17.3 Definition of Done per check
+### 17.3 Test wajib Control Graph & Policy-as-Code
+
+Setiap graph/policy release candidate wajib membuktikan:
+
+1. Graph valid dengan node/edge minimum, provenance, scope, dan snapshot hash;
+   dangling edge, duplicate identity, invalid edge pair, cycle, framework
+   mismatch, cross-tenant reference, demo/live mixing, dan hash mismatch ditolak.
+2. Policy pass/fail/unknown/error/not-applicable pada golden vectors menghasilkan
+   expected output, deterministic message, explanation code, required inputs,
+   evidence references, dan output hash yang sama pada repeated run.
+3. Missing, stale, expired, integrity-failed, partial, schema-incompatible, dan
+   permission-error input menjadi `unknown`/`error`/`needs_review` sesuai
+   taxonomy; tidak ada yang menjadi pass atau menaikkan score.
+4. Policy tidak dapat mengakses network, filesystem tidak terisolasi, secret,
+   credential, clock/random, AI, dynamic loader, atau side effect; limit CPU,
+   memory, recursion, output, dan timeout menghasilkan failure yang terlihat.
+5. Simulation tidak menulis finding, control projection, score, remediation,
+   notification, report eligibility, atau Trust Publication; hasil memiliki
+   label non-production dan expiry.
+6. Hanya reviewer yang berbeda dari author dapat approve/publish; publish
+   atomic, idempotent, optimistic-concurrency protected, dan menyimpan pair
+   version/hash graph-policy serta capability diff.
+7. Withdraw, supersede, dan rollback mempertahankan histori, menghentikan
+   evaluation baru yang tidak eligible, membuat impact record, dan menurunkan
+   capability bila dependency/proof expired.
+8. Exception memiliki scope, owner, separate approver, justification,
+   compensating control bila relevan, expiry, audit, dan tidak mengubah raw
+   finding/evidence; expiry job mengembalikan gap secara terlihat.
+9. Dua organization tidak dapat membaca atau mereferensikan graph node, policy
+   source, simulation input, evaluation, exception, atau impact record organisasi
+   lain melalui UI/API/job/report/export.
+10. Rebuild graph/evaluation dari snapshot yang sama identik; replay event/job
+    tidak menggandakan evaluation, notification, impact, exception, atau audit.
+
+### 17.4 Definition of Done per check dan policy
 
 Sebuah check hanya boleh diberi `implemented` jika:
 
@@ -1971,6 +2351,11 @@ Sebuah check hanya boleh diberi `implemented` jika:
 - Error permission dibedakan dari fail.
 - Control mapping dan remediation template tersedia.
 - Manual test memiliki expected result.
+
+Policy bundle dan graph snapshot hanya boleh diberi `implemented`/`live_verified`
+jika seluruh test M-16 di atas lulus, language/runtime RFC disetujui, dossier
+M-16 lengkap, dan proof record menghubungkan setiap result ke graph/policy/input
+hash, evaluator version, test ID, reviewer, limitation, serta expiry.
 
 ---
 
@@ -1987,6 +2372,18 @@ Setiap scan memiliki correlation ID dan mencatat:
 - notification trigger/delivery;
 - error class dan redacted message.
 
+Setiap operasi graph/policy juga mencatat:
+
+- organization, actor, role, purpose, correlation ID, idempotency key, and
+  optimistic-concurrency version;
+- graph ID/snapshot hash, policy bundle/version, evaluator version, input snapshot
+  hash, target scope, and dependency versions;
+- validation/lint/compile/test/simulation/publish/evaluation state, duration,
+  queue wait, retry, resource limits, result counts, coverage, data quality,
+  required inputs, and error code;
+- approval/review actor separation, impact count, exception ID/expiry, rollback
+  reference, and redacted source/provenance references.
+
 Dashboard internal minimum:
 
 - scan success/partial/error rate;
@@ -1997,6 +2394,13 @@ Dashboard internal minimum:
 - notification latency;
 - AI token/cost per organization/feature/provider;
 - payment webhook failure/replay.
+- graph validation failure and invalid edge rate;
+- policy lint/test failure and approval lead time;
+- simulation queue/duration/failure rate;
+- evaluation p50/p95 duration, timeout/resource-limit rate, unknown/error rate,
+  coverage, stale-input rate, and result rebuild mismatch;
+- publish/withdraw/rollback count, impacted entity count, exception expiry lag,
+  and policy bundle proof expiry.
 
 Alert operasional dibuat untuk:
 
@@ -2006,6 +2410,17 @@ Alert operasional dibuat untuk:
 - object storage gagal;
 - backup/restore gagal;
 - provider rate limit atau API schema berubah.
+- graph snapshot hash mismatch, orphan/dangling edge, or cross-tenant reference;
+- policy runtime/schema drift, evaluator timeout, sandbox violation, or
+  dependency/proof expiry;
+- evaluation backlog/dead-letter, repeated unknown/error, rebuild mismatch,
+  failed rollback, or exception expiry job lag.
+
+Runbook M-16 minimum: quarantine invalid graph/policy, disable new evaluation
+without deleting history, withdraw/rollback to the last eligible pair, replay
+evaluation idempotently, expire exceptions, inspect impact lineage, recover
+dead-letter jobs, and communicate customer-visible downgrade. No operator action
+may edit immutable graph/policy/evaluation history or force `pass`.
 
 ---
 
@@ -2041,6 +2456,11 @@ dan rencana rollback/migrasi bila relevan.
 | AI membuat klaim legal | P-07, §13 | Prompt/output guardrail test |
 | Scan double-run/charge | §7.2, §17.2 | Idempotency test |
 | Drift terlambat diketahui | §7.3, §14.3, §18 | Notification latency metric |
+| Graph lineage atau policy impact tidak dapat ditelusuri | §0.2, §4.7 M-16, §8.4 | Snapshot hash/rebuild equality, lineage E2E, impact record |
+| Policy mengubah status tanpa bukti atau side effect | §8.4, §10, §11, §17.3 | Sandbox purity test, no-write simulation test, unknown/error-to-pass negative test |
+| Policy version/runtime drift menghasilkan hasil berbeda | §8.4, §10.1, §17.3 | Golden vectors, evaluator version/hash proof, repeated-run equality |
+| Unauthorized policy publish/exception atau tenant graph leakage | §3, §10, §11.1, §17.3 | Role/approval separation, cross-tenant graph/policy/exception test |
+| Rollback atau exception expiry membuat gap tidak terlihat | §4.7 M-16, §8.4, §18, §23 | Withdraw/rollback drill, expiry notification, customer projection audit |
 | Hosting tidak mendukung desain | §5.3, Fase 0 | Hosting verification gate |
 
 ---
@@ -2066,6 +2486,12 @@ Sebelum merge/deploy:
 - [ ] Workflow dan environment variable terdokumentasi.
 - [ ] Provider contract test masih sesuai dokumentasi resmi.
 - [ ] Report dan status control dapat ditelusuri sampai evidence.
+- [ ] Graph snapshot, policy bundle, input snapshot, evaluator, dan result memiliki
+      version/hash/lineage yang dapat diverifikasi ulang.
+- [ ] Simulation terisolasi dari live projection; `unknown`/error/stale tidak
+      menjadi pass.
+- [ ] Publish, withdraw, rollback, exception, dan expiry memiliki reviewer,
+      idempotency, audit, dan recovery path.
 - [ ] Semua limitation dicatat, bukan diganti data simulasi.
 
 ---
@@ -2085,6 +2511,10 @@ artefak yang dapat direview:
 | `DOC/runbooks/*.md` | incident, provider outage, stuck scan, evidence integrity, restore, credential revoke | Operations |
 | `DOC/test-evidence/` | test account config sans secret, expected/actual, logs redacted, screenshots/reports | QA owner |
 | `DOC/capability-registry.md` | status dan proof reference setiap capability | Product/engineering |
+| `DOC/completion/M-16/contract.md` | graph schema/edge registry, policy grammar/runtime RFC, input/output contract, evaluator sandbox, lifecycle, impact, exception, rollback | M-16 owner + Security |
+| `DOC/completion/M-16/test-matrix.md` | graph validation, golden policy vectors, purity/resource limits, simulation isolation, tenant/role, lifecycle/replay, rollback/expiry evidence | QA owner |
+| `DOC/completion/M-16/proof-record.md` | graph/policy/input/evaluator hashes, test IDs, sandbox/manual evidence, reviewer, limitation, verifiedAt/expiresAt | Product/engineering |
+| `DOC/runbooks/control-graph-policy.md` | invalid graph/policy quarantine, disable, withdraw/rollback, dead-letter, expiry, impact inspection, customer downgrade | Operations |
 
 Secret, token, private key, raw credential, dan signed URL dilarang masuk ke
 artefak, fixture, screenshot, log, commit, atau issue. Test account harus
@@ -2106,7 +2536,11 @@ Sebelum GA, operator harus dapat menjalankan tanpa improvisasi:
 5. menangani `integrity_failed` dengan quarantine, incident, dan re-collection;
 6. mengulang notification yang gagal tanpa duplikasi dan tanpa mengubah finding;
 7. mematikan AI provider/fallback dengan aman tanpa mengganggu deterministic scan;
-8. menghapus/export data sesuai policy, termasuk audit trail dan legal hold.
+8. menghapus/export data sesuai policy, termasuk audit trail dan legal hold;
+9. mengarantina graph/policy invalid, menghentikan evaluation baru, dan
+   mengembalikan pasangan graph/policy eligible tanpa menghapus histori;
+10. memulihkan evaluation dead-letter secara idempotent, mengaudit policy impact,
+    dan memproses exception expiry tanpa force-pass.
 
 Setiap runbook memiliki trigger, severity, owner/on-call, containment, decision
 tree, command/action yang aman, komunikasi customer, evidence collection, recovery,
@@ -2124,7 +2558,7 @@ action; tidak boleh ditutup hanya karena dashboard kembali hijau.
 - Feature flag default deny untuk capability belum `live_verified`. Rollback flag
   tidak boleh merusak append-only evidence atau membuat status baru tampak valid.
 - Production deploy memerlukan reviewer berbeda dari author untuk scan/evidence,
-  auth/tenant, billing, dan AI safety changes.
+  auth/tenant, billing, AI safety, dan graph/policy changes.
 
 ---
 
@@ -2137,6 +2571,10 @@ Sebuah feature/check boleh mulai diimplementasikan hanya jika:
 - tujuan, non-goals, actor/role, tenant scope, dan data classification tertulis;
 - provider contract, endpoint, permission, rate limit, API version/doc revision,
   dan unknown/deprecation behavior memiliki source resmi;
+- untuk M-16: graph node/edge vocabulary, policy grammar/runtime RFC, input/output
+  schema, dependency rules, evaluator purity/resource limits, snapshot/hash
+  algorithm, simulation isolation, impact semantics, exception/expiry, dan
+  rollback pair sudah disetujui;
 - state machine, error taxonomy, freshness/coverage rule, idempotency, dan rollback
   ditentukan;
 - expected evidence schema, redaction rules, retention, audit events, dan test
@@ -2166,6 +2604,10 @@ Capability baru hanya boleh menjadi `live_verified` jika semua ini lulus:
 8. Dokumentasi provider matrix, capability registry, limitations, changelog, and
    customer-facing copy sudah diperbarui.
 9. Reviewer menyetujui proof record; capability mendapat expiry/reverification date.
+10. Untuk M-16, graph/policy/input/evaluator hashes cocok, golden vectors dan
+    repeated-run equality lulus, simulation tidak menulis live state, seluruh
+    impacted entities tercatat, dan rollback/exception-expiry drill memiliki
+    bukti yang dapat dibuka ulang.
 
 ### 24.3 Release gates
 
@@ -2176,14 +2618,21 @@ lulus. Tidak ada customer data sebelum Gate A.
 **Gate B — Evidence vertical slice:** AWS integration verify, satu check
 end-to-end, immutable evidence, hash re-verification, deterministic finding,
 control projection, freshness/coverage, dan negative permission test lulus.
+M-16 hanya boleh menjadi `verification_required` pada Gate B sampai graph
+snapshot, policy bundle, evaluator, dan dependency proof-nya lulus; bila slice
+M-16 diklaim live, graph/policy acceptance matrix dan lineage proof juga wajib.
 
 **Gate C — Customer beta:** seluruh check yang diklaim live memiliki proof record;
 onboarding dan remediation dapat diulang; provider outage terlihat; report/citation
 dapat diaudit; support/runbooks aktif; tidak ada critical security finding.
+M-16 yang customer-facing wajib memiliki approved language/runtime RFC, graph/
+policy dossier, approval separation, simulation isolation, impact/rollback drill,
+exception expiry, dan no-unknown-to-pass evidence.
 
 **Gate D — GA:** Fase 1B operational gates, pentest, load test pada kapasitas
 nyata, restore drill berkala, incident exercise, legal/privacy review, pricing/
-billing reconciliation, SLO dashboard, dan owner on-call disetujui.
+billing reconciliation, SLO dashboard, graph/policy runtime hardening, rollback
+drill, dan owner on-call disetujui.
 
 **Gate E — Region/market expansion:** sebelum market pack baru dipublikasikan,
 provider dan framework yang diklaim live memiliki contract/sandbox evidence,
@@ -2207,6 +2656,7 @@ hasil dengan sample data atau menampilkan optimistic score.
 | 5.1 | Penambahan peta readiness 15 modul utama, kontrak kelengkapan lintas modul, lifecycle/state machine, acceptance behavior, dan dependency gate agar `full feature` tidak disamakan dengan CRUD atau placeholder. |
 | 5.2 | Penguatan core-system delivery: completion matrix M-01–M-15, dossier proof wajib, dependency slices, multi-organization canonical model, state machine/event contract, endpoint coverage, concurrency, dan ledger integrity. |
 | 5.3 | Core system global-ready dengan MVP regional-first: tenant region policy, locale/timezone/currency/tax abstraction, provider adapter/registry, residency boundary, market-pack, dan Gate E ekspansi region. |
+| 5.4 | Menambahkan M-16 Control Graph & Policy-as-Code: typed/versioned graph, policy bundle lifecycle, deterministic sandbox evaluator, simulation, impact/exception/rollback, canonical entities/events/API/UI, test and observability contract, traceability, dossier, dan release-gate rules. Capability tetap `planned`/`verification_required` sampai proof record lulus. |
 
 Perubahan besar terhadap keputusan final memerlukan RFC baru dan pembaruan versi
 dokumen ini. `/DOC/PRD-JOBEN-ENTERPRISE.md` tetap menjadi sumber kebenaran terbaru

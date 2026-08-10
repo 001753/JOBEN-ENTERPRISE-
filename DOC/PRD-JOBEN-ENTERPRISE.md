@@ -247,6 +247,40 @@ Urutan prioritas ditentukan oleh risiko produk:
 6. Report dan auditor workflow.
 7. Billing, AI, growth, dan fitur pendukung.
 
+### 4.4 Kontrak “real work, completed, full feature”
+
+Istilah `full feature` dalam PRD ini tidak berarti semua modul harus live pada
+hari pertama. Artinya, setiap modul yang diaktifkan pada suatu release harus
+memiliki lifecycle utuh dan dapat dipakai sampai hasil akhirnya tanpa
+intervensi database manual, data contoh, atau status optimistis dari frontend.
+Modul yang belum memenuhi kontrak wajib tetap `not_implemented`,
+`verification_required`, atau `degraded` dan tidak boleh ditampilkan sebagai
+fitur selesai.
+
+Sebuah modul dinyatakan `completed` hanya jika:
+
+1. boundary, owner, actor/role, tenant scope, dan source of truth sudah tertulis;
+2. seluruh state transition validasi server-side dan memiliki state terminal yang
+   jelas, termasuk retry, cancel, archive, dan recovery bila relevan;
+3. alur utama dari create/configure sampai inspect/export/close dapat dijalankan
+   melalui UI dan API tanpa bypass administratif tersembunyi;
+4. input, output, error taxonomy, partial result, freshness, idempotency,
+   permission, audit event, retention, dan rollback telah dikontrak;
+5. tidak ada tombol, endpoint, job, atau provider adapter yang menghasilkan
+   placeholder, silent fallback, default pass, atau data sintetis pada jalur live;
+6. test happy path, empty state, validation, unauthorized, cross-tenant,
+   duplicate/replay, timeout/provider failure, partial result, schema drift, dan
+   recovery tersedia dan lulus;
+7. operational runbook, metric, alert, cost ceiling, dan customer-facing
+   limitation tersedia; dan
+8. `CapabilityRecord` memiliki proof record, tanggal verifikasi, expiry, serta
+   reviewer yang berbeda dari author untuk capability berisiko tinggi.
+
+Kriteria ini berlaku untuk scan, evidence, control, policy, risk, vendor,
+regulation, report, trust/auditor, notification, billing, AI, auth, dan
+operations. CRUD generik bukan definisi kelengkapan; state machine dan hasil
+bisnis yang dapat diverifikasi adalah definisinya.
+
 ---
 
 ## 5. Keputusan Arsitektur
@@ -418,6 +452,68 @@ lebih singkat bila provider mengumumkan deprecation. CI menolak release jika pro
 record kedaluwarsa, fixture tidak tersedia, atau status capability bertentangan
 dengan registry kode. UI/API harus mengekspos status capability untuk admin dan
 menampilkan limitation yang relevan kepada customer.
+
+### 6.3 Kontrak lintas modul
+
+Semua modul domain harus mengikuti kontrak berikut sebelum diberi status
+`implemented`:
+
+```text
+ModuleContract
+  moduleId, version, owner, tenantScope, dataClassification
+  sourceOfTruth, actors[], capabilities[], nonGoals[]
+  states[], transitions[], terminalStates[]
+  commands[]          # mutation yang idempotent
+  queries[]           # read yang cursor-paginated dan tenant-scoped
+  domainEvents[]      # immutable fact untuk modul lain
+  failureClasses[]    # validation/auth/conflict/provider/timeout/schema/system
+  auditEvents[]       # actor, purpose, scope, result, correlationId
+  retentionPolicy, rollbackStrategy, runbookRefs
+  slo, costCeiling, featureFlag, capabilityRecordId
+```
+
+Aturan yang mengikat:
+
+- Modul hanya mengubah source of truth miliknya sendiri. Modul lain membaca
+  domain event atau projection versioned, bukan menulis tabel internal secara
+  langsung.
+- Command yang dapat dipanggil ulang menggunakan `Idempotency-Key`; request hash
+  berbeda pada key yang sama selalu ditolak sebagai conflict.
+- Query selalu menerima resolved `organizationId` dari session/actor context.
+  `organizationId` dari request hanya digunakan sebagai input yang divalidasi,
+  bukan sebagai authorization.
+- Setiap state transition menyimpan `fromState`, `toState`, actor, reason,
+  timestamp, correlation ID, dan version. Transition tidak valid menghasilkan
+  error stabil tanpa mengubah data.
+- Error provider, timeout, dan partial result tidak boleh diubah menjadi
+  `completed`, `met`, `paid`, `published`, atau `verified`.
+- Event dan audit log tidak menjadi pengganti source of truth; keduanya harus
+  mereferensikan entity/version yang dapat dibaca dan diverifikasi.
+- Delete customer-facing hanya berupa soft delete/archive bila histori,
+  evidence, legal hold, atau audit membutuhkan preservasi. Hard delete harus
+  melalui policy deletion workflow yang terdokumentasi.
+- UI tidak boleh menyembunyikan capability yang gagal. UI harus menampilkan
+  status capability, umur data, alasan blokir, dan tindakan pemulihan yang
+  tersedia.
+
+### 6.4 Status capability dan aturan publikasi
+
+| Status | Boleh dipanggil customer | Boleh memengaruhi compliance | Bukti minimum |
+|---|---:|---:|---|
+| `planned` | Tidak | Tidak | requirement dan owner |
+| `not_implemented` | Tidak | Tidak | limitation dan roadmap |
+| `experimental` | Hanya allowlist internal | Tidak | test terbatas + flag deny-by-default |
+| `demo` | Hanya namespace demo terisolasi | Tidak | watermark + database demo |
+| `verification_required` | Tidak | Tidak | daftar gap dan expiry |
+| `degraded` | Terbatas, dengan banner | Tidak menaikkan status/score | incident, scope dampak, workaround |
+| `live_verified` | Ya, sesuai role/plan | Ya, sesuai kontrak | proof record lengkap dan belum expired |
+| `deprecated` | Tidak untuk operasi baru | Tidak | migration/rollback plan |
+
+Perubahan dari status selain `live_verified` ke `live_verified` memerlukan
+reviewer, capability diff, proof record baru, dan pemeriksaan bahwa semua
+dependency module juga `live_verified`. Public Trust Page, report, chatbot,
+billing entitlement, dan customer copy tidak boleh menyebut capability yang
+belum `live_verified`.
 
 ---
 

@@ -1,0 +1,1 @@
+- [PRD-to-phase traceability](prd-phase-traceability.md) — setiap requirement wajib punya phase owner, dependency, acceptance evidence, dan gate sebelum capability live.

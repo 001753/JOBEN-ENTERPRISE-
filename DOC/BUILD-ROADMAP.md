@@ -1,11 +1,18 @@
 # JOBEN ENTERPRISE — Build Roadmap
 
 **Sumber kebenaran:** [`PRD-JOBEN-ENTERPRISE.md`](./PRD-JOBEN-ENTERPRISE.md)  
-**Status:** roadmap engineering awal; belum ada capability aplikasi yang boleh
-  diklaim `live_verified`.  
+**Versi roadmap:** 2.0 — PRD-complete phase contract  
+**Status:** roadmap engineering; repository belum memiliki capability aplikasi yang
+boleh diklaim `live_verified`.  
 **Bahasa kerja:** Indonesia; istilah teknis mengikuti kontrak PRD.  
 **Tujuan:** membangun produk yang dapat dipakai dari kondisi nyata sampai operasi
   produksi, tanpa melewati gate kebenaran data, keamanan, dan recovery.
+
+**Aturan kelengkapan:** PRD §0–§25 adalah sumber kebenaran. Setiap requirement
+harus memiliki phase pemilik, work package, dependency, acceptance evidence, dan
+release gate pada dokumen ini. Requirement lintas-phase harus memiliki pekerjaan
+atau kontrol berulang pada setiap phase yang menggunakannya; cukup menyebutnya
+sebagai “cross-cutting” tanpa pemilik phase tidak dianggap coverage.
 
 > “Complete” di roadmap ini berarti setiap capability yang dirilis memiliki
 > lifecycle utuh, source of truth, failure path, test, observability, runbook,
@@ -15,7 +22,7 @@
 
 ---
 
-## 1. Aturan prioritas
+## 1. Aturan prioritas dan kontrol lintas-phase
 
 Urutan build ditentukan oleh risiko, bukan oleh halaman yang paling mudah
 dibuat:
@@ -45,6 +52,15 @@ dibuat:
   screenshot, atau response.
 - Satu phase tidak dianggap selesai karena jumlah endpoint, halaman, atau
   coverage test; exit gate dan proof record harus lengkap.
+- Setiap phase wajib memperbarui `CapabilityRecord`, decision/RFC log, provider
+  matrix, data classification, threat model, test evidence, runbook, dan
+  customer limitation yang terdampak.
+- Setiap phase memiliki **phase owner**, **reviewer independen**, daftar capability
+  yang boleh naik status, dan daftar capability yang wajib tetap
+  `planned`/`verification_required`/`degraded`.
+- Setiap release candidate harus diuji pada tiga kondisi: live customer namespace,
+  provider sandbox/disposable account, dan demo namespace yang terisolasi. Data
+  demo tidak boleh dipakai untuk membuktikan capability live.
 
 ---
 
@@ -66,6 +82,25 @@ dibuat:
 Phase 0 sampai 1B adalah jalur MVP live. Phase 2–7 adalah ekspansi setelah
 vertical slice terbukti. Phase 8 bukan “tambahan kosmetik”; GA tidak boleh
 disamakan dengan MVP beta.
+
+### 2.1 Kontrak keputusan phase
+
+| Phase | Input wajib | Output yang boleh diklaim | Tidak boleh diklaim sebelum exit |
+|---|---|---|---|
+| P0 | PRD baseline, hosting/provider facts, RFC open items | Foundation siap menerima sandbox/customer data sesuai scope | scan, score, finding, live connector, payment, AI |
+| P1 | Gate A, AWS contract, disposable AWS sandbox | AWS evidence vertical slice dan checks yang proof-nya valid | provider kedua, score complete bila coverage incomplete |
+| P1B | Gate B, provider matrix GitHub, operational owner | Beta customer dengan report, alert, operations, billing sandbox | GA, auditor/public evidence, AI normatif |
+| P2 | Gate C, eligible evidence, legal/public copy review | Trust/auditor/public surface yang scoped dan revocable | claim certification, stale/demo publication |
+| P3 | Gate C/S4, official ISO source, mapping owner | ISO framework/mapping/checks yang verified per capability | ISO certification/attestation |
+| P4 | Gate C/S4, privacy source and residency facts | Privacy operations yang auditable dan policy-bound | legal conclusion atau unverified residency claim |
+| P5 | Stable M-05/M-06, AI safety RFC and golden set | AI questionnaire/assistant dengan citation dan human approval | AI-written compliance truth |
+| P6 | M-05/M-06, PCI scope source, human-review workflow | SAQ readiness assistant | ASV scanning, certification, normative auto-approval |
+| P7 | M-01/M-12/M-13, delegated-access RFC | Agency and auditor marketplace boundaries | delegated write access to compliance truth |
+| P8 | All claimed live capabilities, incident/restore/pentest evidence | GA release with SLO, recovery, legal, on-call | release with expired proof or unresolved critical truth/security risk |
+
+Jika input phase belum terpenuhi, implementation boleh hanya berupa contract,
+fixture, threat model, atau `verification_required` surface. Capability tidak boleh
+melompati phase melalui feature flag, seed, atau UI.
 
 ---
 
@@ -244,12 +279,12 @@ terverifikasi. Urutan internal:
 
 1. root MFA;
 2. password policy;
-3. CloudTrail aktif;
-4. CloudTrail log validation;
-5. S3 public access block;
-6. S3 encryption;
-7. security group exposure;
-8. IAM access key age/rotation.
+3. S3 public access;
+4. S3 encryption;
+5. CloudTrail;
+6. security group exposure;
+7. unused access key;
+8. full admin inline policy.
 
 Untuk setiap check:
 
@@ -631,7 +666,101 @@ hasil dengan sample data atau optimistic score.
 
 ---
 
-## 3. Work breakdown prioritas
+## 9. Master traceability register — PRD §0–§25
+
+Register ini adalah pemeriksaan kelengkapan, bukan pengganti kontrak detail pada
+PRD. Setiap baris memiliki **phase owner**, phase yang melakukan verification
+ulang, dan evidence minimum. Requirement baru boleh diberi status selesai hanya
+jika proof record-nya direferensikan dari `CapabilityRecord`.
+
+| PRD | Cakupan yang wajib masuk delivery | Phase owner | Verification ulang | Evidence minimum |
+|---|---|---|---|---|
+| §0 | Anti-false-data, definition of truth, demo isolation, perubahan reversible | P0 | P1–P8 untuk capability terdampak | decision log, threat model, live/demo negative test |
+| §1 | Sasaran bisnis, sync ≤6 jam, alert <15 menit, single source of truth, batas klaim | P0 | P1–P8 copy dan metric review | product contract, SLO proof, disclaimer review |
+| §2 | P-01 sampai P-08: truth, no fake data, deterministic, evidence, failure, tenant, human approval, least privilege | P0 | Semua phase dan module gate | invariant/security test matrix, capability diff |
+| §3 | Persona dan OWNER/ADMIN/MEMBER/AUDITOR/GRC access, MFA | P0 | P1–P7 role regression | permission matrix, E2E role test, audit record |
+| §4.1–4.3 | MVP scope, out-of-scope, priority, staged live claim | P0 | Setiap gate dan release | scope baseline, registry, release diff |
+| §4.4–4.10 | Full-feature contract, M-01–M-15, dossier, S0–S6, Ready/Done | P0 | P1–P8 per module | module contract, dossier, independent sign-off |
+| §5 | Target architecture, stack, hosting prerequisites, external services, RFC rule | P0 | P1B/P8 capacity dan migration review | hosting verification, provider matrix, RFC/rollback |
+| §6 | Repository target, scan package, check/capability registry, ModuleContract, status/publication rules | P0 | P1–P8 registry consistency | schemas, registry diff, CI status validation |
+| §7 | Scan, cron, idempotency, drift, AWS/GitHub/Google connector/check contracts | P1 | P1B/P3 provider re-verification | sandbox comparison, permission matrix, check dossiers |
+| §8 | Finding/control statuses, freshness, coverage, data quality, score/rebuild | P1 | P3/P4 framework regression | deterministic fixtures, rebuild equality, score proof |
+| §9 | Evidence lifecycle, redaction, hash/WORM/legal hold, remediation, PDF | P1 | P1B/P2/P5 eligibility review | hash/retention drill, PDF artifact, remediation E2E |
+| §10 | Canonical entities, constraints, state machines, domain events, append-only rules | P0 | Every schema/event/migration phase | schema review, transition tests, replay proof |
+| §11 | Customer APIs, internal jobs, HTTP envelope, idempotency, cursors, signed access, webhooks | P0 | Every endpoint introduced | OpenAPI/contract, auth, replay, tenant tests |
+| §12 | Tokens, screens, truthful states, accessibility, EN/ID/ZH i18n | P0 | P1–P8 touched screens | visual states, a11y/localization test, locale inventory |
+| §13 | AI gateway, routing, scoped retrieval, citation/refusal, approval, public FAQ | P5 | P8 disable/fallback drill | golden set, citation proof, cost log, injection test |
+| §14 | IDR catalog, payment boundary, regulation monitor, channels, alert policy | P1B | P2–P4/P8 source/reconciliation review | webhook reconciliation, source hash, delivery evidence |
+| §15 | Encryption, secrets, rate limit, audit, backup, residency, deletion, NFR, patch SLA | P0 | P1–P8 security/ops gate | secret/log scan, restore, SLO telemetry, residency decision |
+| §16 | Phase 0–8 deliverables dan release gates | P0 | Gate A/B/C/D, S4/S5/S6 | signed gate packet and decision |
+| §17 | Test pyramid, scan tests 1–10, check Definition of Done | P0 | Test pack tumbuh tiap capability | CI, sandbox expected/actual, two-org regression |
+| §18 | Correlation, telemetry, ops dashboard, alerts | P0 | P1–P8 metric/alert review | redacted logs, dashboard, alert timestamps, drills |
+| §19 | Ten open decisions dan format RFC | P0 | Sebelum phase dependent dimulai | RFC options/owner/impact/rollback/date |
+| §20 | Risk-to-requirement traceability | P0 | Update setiap gate | risk register, linked test/proof IDs |
+| §21 | Pre-coding dan merge/deploy checklist | P0 | Mandatory per work package | checklist dan release artifact |
+| §22 | Decision/provider/threat/data/runbook/test/capability artifacts | P0 | Artifact delta setiap phase | artifact inventory dan review links |
+| §23 | Incident runbooks, restore, quarantine, replay, AI disable, deletion, release discipline | P1B | P2–P8 drills | runbook drill, incident timeline, rollback proof |
+| §24 | Definition of Ready/Done, Gate A/B/C/D, downgrade on failure | P0 | Applied setiap phase/capability | gate packet dan status transition audit |
+| §25 | Document history dan change control | P0 | Setiap perubahan disetujui | version entry dan RFC/decision reference |
+
+### 9.1 Cross-cutting control pack wajib setiap phase
+
+Kontrol berikut bukan pekerjaan sekali di P0. Phase owner wajib membuat delta
+record untuk setiap phase yang mengubah data, provider, UI, capability, atau
+operational behavior.
+
+| Control pack | P0 baseline | P1–P4 expansion | P5–P7 expansion | P8 release proof |
+|---|---|---|---|---|
+| Truth/provenance | status enum, definition, demo isolation | provider evidence/evaluator/projection | governance, AI, public eligibility | release provenance dan expired-proof block |
+| Tenant/security | authz, scoped repository, MFA | connector/object/queue/report isolation | delegated access, AI retrieval, billing webhook | pentest, SAST, IDOR/replay/SSRF/rate-limit |
+| Lifecycle/recovery | state/event/idempotency | scan/evidence recovery | payment/publication/AI/privacy recovery | restore, rollback, incident exercise |
+| Interface | schema/error/correlation | integration/scan/evidence API | report/notification/governance/billing/AI API | compatibility dan migration proof |
+| UX/i18n | tokens, locale, truthful state taxonomy | onboarding dan scan states | public/auditor/AI/privacy/commercial copy | locale, accessibility, limitation review |
+| Operations | logging, health, CI, backup plan | scan/evidence metrics/runbooks | payment/AI/provider/regulation metrics | SLO dashboard, on-call, cost, release controls |
+| Evidence | classification, retention, proof template | hash/redaction/immutability | citation/publication/DSAR/legal hold | retention/deletion/residency/legal sign-off |
+
+### 9.2 Module-to-phase ownership matrix
+
+| Modul | P0 | P1 | P1B | P2 | P3 | P4 | P5 | P6 | P7 | P8 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| M-01 Identity/RBAC | foundation | regression | beta roles | auditor roles | governance | privacy | AI purpose | approval | delegated | hardening |
+| M-02 Integration/Credential | contract | AWS | GitHub/ops | eligibility | new providers | privacy vendors | document source | PCI scope | agency | rotation/pentest |
+| M-03 Scan/Jobs | contract | AWS engine | resilience | drift/source | expansion | privacy jobs | questionnaire | SAQ jobs | delegated queues | SLO/recovery |
+| M-04 Provider Connector | policy | AWS checks | GitHub | SOC2 source | six providers | privacy sources | parsers/models | PCI source | marketplace | deprecation |
+| M-05 Evidence | data contract | AWS vault | report/restore | publication | ISO evidence | legal hold | citation | SAQ source | delegated | integrity drill |
+| M-06 Finding/Scoring | projection | AWS/SOC2 | beta | eligibility | ISO | privacy impact | matching only | readiness only | no truth write | rebuild/load |
+| M-07 Remediation/Review | lifecycle | AWS | SLA | policy review | ISO gap | DSAR/vendor | AI approval | SAQ approval | delegated review | audit/recovery |
+| M-08 Dashboard/App | shell/tokens | onboarding | beta/i18n | public/auditor | frameworks | privacy | questionnaire | SAQ | branding | a11y/locale |
+| M-09 Report/Export | contract | boundary | PDF/CSV | auditor | ISO | DSAR/DPA | questionnaire | SAQ | branded | artifact/recovery |
+| M-10 Notification | event contract | drift | channels/ops | regulation | ISO | DSAR/breach | AI notices | reminders | marketplace | SLO/replay |
+| M-11 Policy/Risk/Vendor/Reg | contract | SOC2 boundary | regulation ops | monitor/dogfood | ISO mapping | GDPR/vendor | AI draft | PCI policy | agency policy | governance |
+| M-12 Trust/Auditor | eligibility | blocked | prep | full surface | ISO publish | privacy claims | citation boundary | disclaimer | marketplace | revoke/expiry |
+| M-13 Billing/Entitlement | RFC/contract | blocked | sandbox | pricing copy | plan expansion | privacy data | AI cost | PCI plan | agency billing | reconcile |
+| M-14 AI Gateway | safety/RFC | disabled | disabled | public FAQ gate | summary boundary | draft boundary | questionnaire | SAQ | marketplace copy | disable/fallback |
+| M-15 Admin/Ops | foundation | scan/evidence | beta/restore | public/auditor | governance | privacy | AI cost/safety | SAQ | delegated | full GA |
+
+### 9.3 Phase exit register
+
+Setiap phase hanya boleh ditutup jika seluruh deliverable dan proof minimum
+tersedia. Kegagalan satu item menahan phase dan menurunkan capability terdampak
+ke `not_implemented`, `verification_required`, atau `degraded`.
+
+| Phase | Requirement focus | Deliverable wajib | Exit proof minimum |
+|---|---|---|---|
+| P0 / S0 / Gate A | §0, §2–§6, §10–§12, §15–§24; M-01, M-15 foundation | app/CI/env/locale shell; hosting/provider/threat/data artifacts; Prisma/tenant/audit/idempotency; Clerk/MFA/session; demo namespace; health/cron; backup/restore smoke | Gate A packet; two-org authz regression; migration/restore checksum; secret/log scan; open-decision owner/RFC |
+| P1 / S1 / Gate B | §7–§9, §10–§12, §17–§18; M-02–M-08 core | AWS External ID connector; permission matrix; queue/lease/retry/cancel; eight PRD checks; immutable evidence; deterministic finding/control; freshness/coverage; remediation/onboarding UI | AWS sandbox expected-vs-actual; PRD §17.2 tests 1–9; eight check dossiers; hash reverify; rebuild equality; two-org regression |
+| P1B / S2–S3 / Gate C | §3, §7–§12, §14–§15, §17–§18, §23; M-02/M-04, M-09/M-10, M-13/M-15 partial | GitHub App; deterministic PDF/CSV snapshot; provenance/signed access; notification ledger and drift; queue operator controls; runbooks; billing sandbox/webhook reconciliation | Gate C packet; two-reader PDF; delivery timestamp p95; replay/out-of-order payment tests; restore/incident drill; beta limitation/rollback |
+| P2 / S4 | §1, §3, §9, §11–§14, §18–§24; M-08–M-12 | truthful marketing/pricing; Trust Publication lifecycle; scoped auditor access; SOC 2 source monitor; dogfooding; WhatsApp only after RFC | publication eligibility/revoke tests; expired/stale/demo exclusion; auditor scope tests; source hash; copy/legal review |
+| P3 | §4.2, §7–§12, §14–§15, §17–§20, §24; M-04/M-06/M-07/M-11/M-12 | versioned 93 Annex A; SOC 2↔ISO mapping; gap/readiness workflow; six additional connectors one at a time | official-source provenance; mapping impact/rebuild; per-provider sandbox/permission/schema-drift proof; no unverified status expansion |
+| P4 | §4.2, §5, §10–§11, §14–§15, §17–§24; privacy M-05/M-07/M-08/M-09/M-10/M-11/M-15 | PII/data map; cookie scanner; retention/deletion/legal hold/residency; DSAR; approved DPA; breach timer workflow; vendor risk | scoped DSAR/export/delete evidence; legal-hold preservation; residency/vendor verification; source/version audit; breach alert |
+| P5 / S5 | §1–§2, §4.2, §6, §9–§11, §13–§15, §17–§18, §23–§24; M-14 | gateway routing/retrieval/redaction; PDF/Excel/CSV questionnaire; citations/refusal; human approval; usage/cost; disable/fallback | golden set; citation quote verification; cross-tenant/injection/stale/legal refusal; `humanApproved`; cost log; provider outage drill |
+| P6 | §4.2, §9, §11–§15, §17, §20–§24; PCI M-06–M-09/M-11/M-14/M-15 | SAQ scope wizard; readiness checklist; citations/remediation; review/approval/export; permanent no-ASV boundary | PCI source/version; ambiguity/no-evidence refusal; approval audit; disclaimer review; no certification claim |
+| P7 | §3, §4.2, §6, §9–§12, §14–§15, §17–§18, §20, §23–§24; M-01/M-05/M-07–M-13/M-15 | agency/sub-org isolation; delegated roles/support; branding/domain; billing boundary; auditor marketplace profile/consent/scope/revoke | delegated permission matrix; tenant escape/offboarding/revoke tests; branding cannot alter truth; expiry audit; marketplace limitation |
+| P8 / S6 / Gate D | all claimed-live PRD requirements, especially §15, §17–§24 | pentest; security/dependency/log review; load/SLO/RPO/RTO; restore/rollback/outage/replay drills; release manifest; on-call/legal/privacy review | Gate D; non-expired dossiers; 99.5%/p95 targets measured; 100% claimed locales; no unaccepted critical/high truth/security issue; signed release diff |
+
+---
+
+## 10. Work breakdown prioritas
 
 Backlog harus dikerjakan dalam urutan berikut. Item di bawah tidak boleh
 dilewati dengan alasan UI sudah selesai.
@@ -651,10 +780,14 @@ dilewati dengan alasan UI sudah selesai.
 | P1 | WP-10 Report/notification/ops | Gate B | M-09/M-10 and beta operations |
 | P1 | WP-11 Billing sandbox | WP-02 + payment RFC | M-13 sandbox, isolated from scan truth |
 | P1 | WP-12 Trust/auditor | Gate C | M-12 scoped public/auditor access |
-| P1 | WP-13 ISO/GDPR | Gate C + source verification | governance expansion |
-| P1 | WP-14 AI questionnaire | stable M-05/M-06 + AI RFC | M-14 safe assistant |
-| P2 | WP-15 PCI/white-label/marketplace | relevant gates | expansion modules |
-| P0 GA | WP-16 Hardening/GA | all live modules | Gate D |
+| P1 | WP-13 ISO framework/mapping | Gate C + official ISO source | versioned 93 Annex A, SOC 2↔ISO mapping, gap workflow |
+| P1 | WP-14 ISO provider expansion | WP-13 + provider RFC per connector | Azure/GCP/Okta/Vercel/Supabase/Firebase, one-by-one proof records |
+| P1 | WP-15 Privacy operations | Gate C + privacy source/residency decision | PII map, cookie scanner, DSAR, DPA, vendor risk, breach workflow |
+| P1 | WP-16 AI gateway/questionnaire | stable M-05/M-06 + AI RFC + golden set | M-14 scoped retrieval, citation/refusal, human approval, usage/cost control |
+| P2 | WP-17 PCI SAQ assistant | M-05/M-06 + PCI source + human-review workflow | SAQ scope wizard, readiness checklist, approved export; no ASV scanning |
+| P2 | WP-18 White-label agency | M-01/M-12/M-13 + delegated-access RFC | agency/sub-organization, delegated roles, branding, billing/residency boundary |
+| P2 | WP-19 Auditor marketplace | WP-18 + marketplace contract/consent policy | profile, invite, scope, expiry/revoke, conflict and offboarding controls |
+| P0 GA | WP-20 Hardening/GA | all live modules + S6 | Gate D, pentest, load/SLO, restore/incident/legal/on-call proof |
 
 ### Format task implementasi per work package
 
@@ -676,7 +809,7 @@ CapabilityRecord and Definition of Ready/Done
 
 ---
 
-## 4. Definition of Ready dan Definition of Done
+## 11. Definition of Ready dan Definition of Done
 
 ### Ready sebelum coding capability
 
@@ -707,7 +840,7 @@ CapabilityRecord and Definition of Ready/Done
 
 ---
 
-## 5. Larangan urutan build
+## 12. Larangan urutan build
 
 Jangan melakukan hal berikut sebelum dependency dan gate-nya lulus:
 
@@ -724,7 +857,7 @@ Jangan melakukan hal berikut sebelum dependency dan gate-nya lulus:
 
 ---
 
-## 6. Milestone release
+## 13. Milestone release
 
 | Milestone | Artinya | Tidak boleh dilakukan |
 |---|---|---|
@@ -740,3 +873,10 @@ Roadmap ini menjadi rencana pembangunan di atas PRD. Ketika implementasi dimulai
 setiap phase harus diterjemahkan menjadi task kecil yang dapat direview dan
 dibuktikan; perubahan scope atau keputusan provider yang memengaruhi dependency
 wajib masuk decision log/RFC, bukan diputuskan diam-diam di kode.
+
+## 14. Riwayat roadmap
+
+| Versi | Perubahan |
+|---|---|
+| 1.0 | Roadmap awal dari foundation sampai GA, dengan dependency dan gate utama. |
+| 2.0 | Menambahkan kontrak kelengkapan PRD §0–§25, phase owner/verification/evidence, cross-cutting control pack, ownership M-01–M-15, phase exit register, dan work package terpisah untuk ISO, privacy, AI, PCI, white-label, marketplace, serta GA. Menyamakan delapan AWS checks dengan PRD §7.4. |

@@ -5,7 +5,7 @@
 **Kategori:** Compliance Automation & Trust Management Platform  
 **Domain target:** `jobenapp.cloud`  
 **Dokumen kanonik:** `/DOC/PRD-JOBEN-ENTERPRISE.md`  
-**Versi:** 5.1 — Complete Module Readiness Contract
+**Versi:** 5.2 — Core System Delivery Readiness Contract
 **Status:** Baseline engineering; implementasi hanya boleh mengklaim capability yang telah melewati gate pada §24
 **Bahasa dokumen:** Bahasa Indonesia; istilah standar teknis dan compliance mengikuti istilah resmi  
 **Sumber konsolidasi:** PRD master v3.0 dan Addendum Scan & Continuous Control Monitoring v1.0
@@ -1174,10 +1174,19 @@ Model inti PostgreSQL/Prisma:
 
 ```text
 Organization
-  id, name, slug, domain, region, preferredLocale, isDemoMode
+  id, name, slug, domain, region, preferredLocale, mode, status,
+  createdAt, archivedAt
 
 User
-  organizationId, clerkUserId, email, role, preferredLocale
+  id, clerkUserId, email, preferredLocale, status, lastIdentitySyncAt
+
+OrganizationMembership
+  organizationId, userId, role, status, invitedBy, invitedAt, acceptedAt,
+  suspendedAt, revokedAt, version
+
+OrganizationInvitation
+  organizationId, emailHash, role, tokenRef, status, expiresAt,
+  createdBy, acceptedBy, acceptedAt, revokedAt
 
 Framework
   code, name, version, isActive
@@ -1193,56 +1202,112 @@ OrgControlStatus
 
 Integration
   organizationId, provider, status, credentialsRef, lastSyncAt,
-  consecutiveFailures
+  consecutiveFailures, verificationVersion, verifiedAt, revokedAt
+
+IntegrationVerification
+  integrationId, status, requestedBy, providerIdentity, permissionResults,
+  providerContractVersion, startedAt, finishedAt, errorCode, evidenceId
 
 CheckDefinitionMeta
-  id, provider, severityDefault, status, requiredPermissions
+  id, provider, severityDefault, status, version, requiredPermissions,
+  providerContractVersion, verifiedAt, expiresAt
 
 CheckControlMapping
   checkDefinitionId, controlId
 
 ScanRun
-  integrationId, status, startedAt, finishedAt, triggeredBy, idempotencyKey
+  organizationId, integrationId, status, trigger, requestedBy, idempotencyKey,
+  leaseOwner, leaseExpiresAt, startedAt, finishedAt, cancellationRequestedAt,
+  retryCount, coverage, failureClass, correlationId
+
+ScanCheckAttempt
+  scanRunId, checkDefinitionId, status, attemptNo, startedAt, finishedAt,
+  resourceCounts, errorCode, providerRequestIds, correlationId
 
 Evidence
   organizationId, sourceIntegrationId, scanRunId, findingId, controlStatusId,
   type, storageUrl, contentHash, canonicalizationVersion, schemaVersion,
   providerRequestId, sourceEndpoint, collectedAt, retentionUntil, immutable,
-  integrityStatus, supersedesEvidenceId
+  integrityStatus, legalHoldStatus, supersedesEvidenceId, createdAt
 
 ObservedFact
   evidenceId, provider, resourceKey, observedAt, payloadSchema, extractedFields
 
 Finding
   organizationId, scanRunId, checkDefinitionId, checkVersion, observedFactId,
-  resourceKey, result, errorCode, message, detectedAt, evaluatedAt
+  resourceKey, result, errorCode, message, detectedAt, evaluatedAt,
+  coverageStatus, supersedesFindingId
 
 RemediationTemplate
   checkDefinitionId, summaryI18nKey, whyItMattersI18nKey,
   stepsI18nKey, estimatedEffort
 
+Remediation
+  organizationId, findingId, status, assigneeUserId, dueAt, acknowledgedAt,
+  startedAt, blockedAt, resolvedAt, closedAt, closedBy, closureReason,
+  reopenedAt, version
+
+RemediationActivity
+  remediationId, actor, type, commentRef, evidenceId, createdAt, correlationId
+
 DailyComplianceSnapshot
   organizationId, frameworkId, snapshotDate, score, metCount,
-  partialCount, notMetCount, needsReviewCount
+  partialCount, notMetCount, needsReviewCount, coveragePercent,
+  dataQuality, algorithmVersion, sourceProjectionVersion
 
 AuditLog / ProviderApiLog
   organizationId, actor, action, resource, endpoint, statusCode,
   durationMs, createdAt, metadata
+
+ReportSnapshot / ReportArtifact
+  organizationId, frameworkId, snapshotVersion, status, requestedBy,
+  inputHash, contentHash, storageRef, expiresAt, revokedAt, createdAt
+
+NotificationRule / NotificationDelivery
+  organizationId, eventType, preference, channel, dedupeKey, status,
+  attemptNo, providerMessageRef, nextRetryAt, deliveredAt, acknowledgedAt,
+  failureClass, createdAt
+
+Policy / Risk / Vendor / RegulationUpdate
+  organizationId, entityType, status, version, sourceRef, sourceHash,
+  effectiveAt, reviewDueAt, approvedBy, approvedAt, publishedAt, supersededAt
+
+TrustPublication / AuditorAccess
+  organizationId, status, scope, capabilitySnapshot, evidenceSnapshot,
+  tokenRef, expiresAt, revokedAt, publishedBy, createdAt
+
+Plan / Subscription / PaymentEvent / Entitlement
+  planVersion, organizationId, provider, externalRef, status, effectiveAt,
+  idempotencyKey, eventHash, receivedAt, processedAt, reconciledAt
+
+AiUsageLog / ChatSession / ChatMessage
+  organizationId, actor, purpose, retrievalRefs, modelVersion, status,
+  inputTokens, outputTokens, estimatedCost, citations, refusalCode, createdAt
+
+Incident / BackupManifest / MigrationRecord
+  scope, severity, status, owner, detectedAt, containedAt, resolvedAt,
+  timelineRef, checksum, schemaVersion, verifiedAt, rollbackRef
 ```
 
-Modul lain yang diperlukan:
+Entitas tambahan yang tetap diperlukan di luar tabel canonical:
 
 ```text
-Policy, Risk, Vendor, RegulationUpdate,
 Questionnaire, QuestionnaireItem,
-Plan, Subscription, PaymentTransaction,
-AiUsageLog, ChatSession, ChatMessage, Referral
+Referral
 ```
 
 Constraint wajib:
 
 - Semua entity customer memiliki `organizationId` langsung atau relasi yang
   dapat divalidasi.
+- `User` adalah identity global; role dan akses organisasi hanya berasal dari
+  `OrganizationMembership` yang aktif. Tidak boleh ada kolom `User.role` atau
+  `User.organizationId` yang dijadikan authorization source.
+- Satu user boleh memiliki banyak membership, tetapi setiap request, job, signed
+  URL, dan webhook wajib menyelesaikan tepat satu organization context sebelum
+  repository dipanggil.
+- Invite token disimpan sebagai reference/hash, bukan plaintext; token memiliki
+  expiry, single-use, revoke, dan replay audit.
 - Unique key pada kombinasi organisasi + entity yang sesuai.
 - `Integration.credentialsRef` bukan credential plaintext.
 - `Evidence.immutable` tidak dapat diubah setelah ditulis; database trigger/service
@@ -1255,6 +1320,76 @@ Constraint wajib:
   ia bukan source of truth.
 - `publishedAt` policy AI tetap null sampai approval.
 - `humanApproved` questionnaire wajib true sebelum export/send.
+- State ledger untuk subscription, report, notification, auditor access, incident,
+  dan job bersifat append-only atau memiliki transition audit; projection boleh
+  direbuild dari ledger.
+- Foreign key tenant tidak cukup sebagai authorization: service/repository wajib
+  melakukan tenant check pada parent dan child, termasuk object storage key,
+  queue message, export, dan webhook reconciliation.
+- Semua timestamp disimpan UTC dengan timezone metadata untuk tampilan; clock
+  skew provider dicatat pada verification/scan dan tidak boleh diabaikan.
+- `mode=demo` hanya boleh merujuk ke database/object namespace demo dan tidak
+  dapat diubah menjadi live melalui update biasa.
+
+### 10.1 State machine canonical core system
+
+Nama state berikut adalah kontrak domain, bukan label UI. Implementer boleh
+menambah state internal yang tidak terlihat customer, tetapi tidak boleh mengubah
+arti, melewati guard, atau menghapus state terminal tanpa RFC. Semua transition
+menulis actor, reason, version, `correlationId`, dan timestamp UTC.
+
+| Modul | State canonical | Terminal sukses/gagal | Guard minimum |
+|---|---|---|---|
+| M-01 | membership `invited → active → suspended/revoked → deleted`; invitation `pending → accepted/expired/revoked` | membership `active`, invitation terminal | verified identity, MFA policy, owner-transfer approval, single-use invite |
+| M-02 | integration `draft → verifying → verified → degraded/error → revoked` | `verified` atau `revoked` | provider identity, scope, permission matrix, clock skew, credential reference |
+| M-03 | run `queued → running → cancelling → completed/partial/failed/cancelled/dead_letter` | semua state setelah `queued` yang terminal | lease owner, idempotency, retry budget, cancellation boundary, dead-letter reason |
+| M-04 | adapter `registered → verification_required → verified → deprecated/disabled` | `verified`, `disabled`, atau `deprecated` | provider contract, fixture, sandbox, permission matrix, expiry |
+| M-05 | evidence `staged → redacted → validated → committed → integrity_failed/quarantined/expired` | `committed`, atau `quarantined` bila gagal | hash/canonical bytes, WORM/retention, legal hold, immutable write |
+| M-06 | evaluation `queued → evaluating → evaluated → projected/rebuild_failed`; control `not_started/needs_review/partial/met/not_met` | evaluation `projected`; control status tetap projection | evidence valid, rule version, coverage, freshness, denominator |
+| M-07 | remediation `open → acknowledged → in_progress → blocked → resolved → closed`; `closed → reopened` | `closed` atau `archived` | actor assignment, due-date policy, latest verification finding, closure reason |
+| M-08 | view `loading → ready/empty/partial/stale/error/degraded` | tidak ada compliance state di UI | response provenance, capability status, locale completeness, tenant query |
+| M-09 | report `requested → queued → generating → ready → expired/revoked/failed` | `ready`, `expired`, `revoked`, atau `failed` | snapshot version, input hash, access scope, artifact hash |
+| M-10 | delivery `eligible → queued → sending → delivered/failed/dead_letter`; `delivered → acknowledged` | `delivered`, `acknowledged`, atau `dead_letter` | preference, quiet hour, emergency policy, dedupe, retry budget |
+| M-11 | record `draft → in_review → approved → published → superseded/withdrawn` | `published`, `superseded`, atau `withdrawn` | reviewer separation, source provenance, mapping impact, effective date |
+| M-12 | publication `draft → published → unpublishing → unpublished`; access `issued → active → expired/revoked` | publication `unpublished`; access `expired/revoked` | live capability, eligible evidence, scope, expiry, revoke audit |
+| M-13 | subscription `pending → active → past_due/grace → cancelled/expired`; payment event `received → verified → applied/reconciled/rejected` | subscription `active/cancelled/expired`; event `reconciled/rejected` | signature, ordering policy, provider reference, entitlement projection |
+| M-14 | request `received → retrieving → generating → validating → answered/refused/failed`; draft `draft → approved/rejected` | request answered/refused/failed; draft approved/rejected | scoped retrieval, citation verification, safety schema, budget, human approval |
+| M-15 | incident `detected → acknowledged → contained → recovering → resolved → reviewed`; release `candidate → blocked/approved → deployed → rolled_back` | incident `reviewed`; release `deployed/rolled_back` | severity owner, evidence timeline, approval separation, rollback proof |
+
+Tidak boleh ada transition langsung dari state input ke state sukses hanya karena
+request HTTP berhasil. `202 Accepted` berarti command diterima/queued; state
+terminal hanya boleh ditulis oleh service/worker pemilik source of truth setelah
+guard dan side effect wajib berhasil. Jika side effect wajib gagal, entity masuk
+state error/degraded yang sesuai dan retry/recovery dicatat.
+
+### 10.2 Domain event minimum
+
+Event berikut adalah immutable fact untuk komunikasi antar modul. Payload event
+wajib memiliki `eventId`, `eventType`, `eventVersion`, `occurredAt`, `actor`,
+`organizationId`, `entityId`, `entityVersion`, `correlationId`, dan `dataRef`.
+Event tidak boleh membawa raw credential, signed URL, atau payload evidence
+restricted; consumer mengambil data melalui scoped service.
+
+| Event | Producer → consumer | Aturan |
+|---|---|---|
+| `MembershipActivated`, `MembershipRevoked` | M-01 → seluruh modul | cache/permission session harus invalidated; revoke berlaku pada request berikutnya |
+| `IntegrationVerified`, `IntegrationRevoked`, `IntegrationDegraded` | M-02 → M-03/M-04/M-08/M-10 | scan baru diblokir bila tidak verified; histori tetap dapat dibaca |
+| `ScanQueued`, `ScanStarted`, `ScanProgressed`, `ScanCompleted`, `ScanPartial`, `ScanFailed` | M-03 → M-06/M-08/M-10/M-15 | duplicate event aman; progress bukan evidence dan bukan compliance status |
+| `EvidenceCommitted`, `EvidenceIntegrityFailed` | M-05 → M-06/M-08/M-09/M-12/M-14 | integrity failure menarik eligibility; consumer tidak boleh memakai evidence tersebut |
+| `FindingEvaluated`, `ControlProjectionRebuilt` | M-06 → M-07/M-08/M-09/M-10/M-14 | finding immutable; projection version wajib cocok dengan report |
+| `RemediationResolved`, `RemediationReopened` | M-07 → M-06/M-08/M-10 | resolved tidak sama dengan closed sebelum verification rule lulus |
+| `ReportReady`, `ReportRevoked` | M-09 → M-08/M-12/M-15 | access harus scope/time-bound dan dapat dicabut |
+| `NotificationDelivered`, `NotificationFailed` | M-10 → M-08/M-15 | delivery tidak mengubah finding atau control status |
+| `RecordApproved`, `RecordPublished`, `RecordWithdrawn` | M-11 → M-08/M-12/M-14 | publish tanpa approval ditolak server-side |
+| `TrustPublished`, `AuditorAccessRevoked` | M-12 → M-08/M-15 | publikasi harus menyimpan eligibility snapshot dan expiry |
+| `SubscriptionChanged`, `EntitlementChanged` | M-13 → M-08/M-15 | entitlement hanya membatasi capability; tidak dapat menulis scan truth |
+| `AiAnswerProduced`, `AiRefused`, `AiDraftApproved` | M-14 → M-08/M-11/M-15 | output AI tidak menulis compliance truth; citation/safety result tersimpan |
+| `IncidentOpened`, `IncidentResolved`, `ReleaseApproved`, `ReleaseRolledBack` | M-15 → audit/operational consumers | incident closure membutuhkan corrective action dan timeline |
+
+Consumer wajib idempotent berdasarkan `eventId`, menyimpan offset/processing
+result, dan mengirim event ke dead-letter setelah retry policy habis. Replay event
+harus menghasilkan state yang sama atau conflict yang dapat diaudit, bukan duplicate
+finding, notification, charge, atau approval.
 
 ---
 
@@ -1273,10 +1408,27 @@ Endpoint minimum:
 | `GET` | `/api/controls/{id}` | finding, evidence, remediation |
 | `GET` | `/api/evidence/{id}` | akses signed/authorized evidence |
 | `POST` | `/api/reports` | enqueue/generate PDF report |
+| `GET` | `/api/reports/{id}` | status, provenance, dan signed report access |
+| `POST` | `/api/reports/{id}/revoke` | cabut akses report |
+| `GET` | `/api/remediations` | daftar remediation tenant dengan cursor |
+| `POST` | `/api/remediations/{id}/transition` | acknowledge/start/block/resolve/close/reopen |
+| `POST` | `/api/remediations/{id}/activities` | komentar atau attach fix evidence |
+| `GET` | `/api/audit` | audit log sesuai role dan scope |
 | `POST` | `/api/chat/sessions` | mulai sesi chatbot tenant |
 | `POST` | `/api/chat/sessions/{id}/messages` | pertanyaan RAG |
 | `POST` | `/api/webhooks/xendit` | callback payment terverifikasi |
+| `POST` | `/api/webhooks/{provider}` | inbox webhook provider yang diaktifkan |
+| `GET` | `/api/billing/subscription` | subscription dan entitlement efektif |
+| `POST` | `/api/billing/checkout` | membuat checkout idempotent |
+| `GET` | `/api/organizations/members` | daftar membership organisasi |
+| `POST` | `/api/organizations/invitations` | membuat invitation |
+| `POST` | `/api/organizations/invitations/{id}/revoke` | mencabut invitation |
+| `POST` | `/api/organizations/members/{id}/transition` | suspend/revoke/role change |
+| `GET` | `/api/capabilities` | capability status dan limitation yang boleh dilihat |
 | `POST` | `/api/internal/jobs/scan-runner` | drain scan queue |
+| `POST` | `/api/internal/jobs/evidence-verify` | verifikasi hash/object/retention |
+| `POST` | `/api/internal/jobs/notification-retry` | drain notification retry/dead-letter |
+| `POST` | `/api/internal/jobs/backup-verify` | verifikasi backup manifest dan restore sample |
 | `POST` | `/api/internal/jobs/regulation-monitor` | fetch perubahan regulasi |
 
 Internal job:
@@ -1309,6 +1461,21 @@ Internal job:
   tidak menghapus evidence historis.
 - `scan` membuat satu `ScanRun` atau mengembalikan run aktif yang sama. HTTP 202
   berarti queued, bukan sukses; client harus membaca progress dan final status.
+- Transition endpoint hanya menerima command yang diizinkan oleh state machine;
+  client tidak boleh mengirim target state arbitrer. Response wajib mengembalikan
+  state baru, transition version, audit reference, dan correlation ID.
+- `POST /api/reports` membuat snapshot dari versi projection yang eksplisit.
+  Report tidak boleh membaca data live secara terpisah untuk bagian yang sama;
+  input hash yang sama menghasilkan artifact yang sama secara semantik.
+- Remediation close wajib membawa `verificationFindingId` dari scan terbaru dan
+  server harus memastikan finding tersebut scope-nya sama, evidence hash-valid,
+  serta memenuhi rule penutupan.
+- Membership transition, role change, ownership transfer, subscription change,
+  trust publication, policy approval, dan AI approval wajib memakai optimistic
+  concurrency (`version`/`If-Match`) agar update lama menjadi conflict, bukan
+  menimpa keputusan terbaru.
+- GET list yang berpotensi besar wajib memiliki `limit` maksimum, cursor expiry,
+  sort yang allowlisted, dan query timeout; count mahal harus eksplisit/asinkron.
 - Webhook payment menyimpan raw payload ter-redact, memverifikasi signature resmi,
   menolak replay, dan memproses event melalui inbox idempotent sebelum subscription
   berubah.
@@ -1814,7 +1981,7 @@ Sebelum merge/deploy:
 ## 22. Artefak wajib sebelum implementasi
 
 PRD ini tidak dianggap siap dikerjakan hanya karena folder aplikasi berhasil
-dibuat. Sebelum feature diberi status `implemented`, repository wajib memiliki
+dibuat. Sebelum capability diberi status `live_verified`, repository wajib memiliki
 artefak yang dapat direview:
 
 | Artefak | Isi minimum | Pemilik |
@@ -1939,6 +2106,7 @@ hasil dengan sample data atau menampilkan optimistic score.
 | 4.0 | Konsolidasi PRD master v3.0 dan Addendum Scan v1.0 menjadi baseline engineering tunggal; konflik status/evidence/path diselesaikan eksplisit. |
 | 5.0 | Kritik dan hardening evidence-first: provenance, freshness/coverage, immutable evidence, AI safety contract, tenant/API security, vertical-slice roadmap, operational runbooks, dan release gates. |
 | 5.1 | Penambahan peta readiness 15 modul utama, kontrak kelengkapan lintas modul, lifecycle/state machine, acceptance behavior, dan dependency gate agar `full feature` tidak disamakan dengan CRUD atau placeholder. |
+| 5.2 | Penguatan core-system delivery: completion matrix M-01–M-15, dossier proof wajib, dependency slices, multi-organization canonical model, state machine/event contract, endpoint coverage, concurrency, dan ledger integrity. |
 
 Perubahan besar terhadap keputusan final memerlukan RFC baru dan pembaruan versi
 dokumen ini. `/DOC/PRD-JOBEN-ENTERPRISE.md` tetap menjadi sumber kebenaran terbaru

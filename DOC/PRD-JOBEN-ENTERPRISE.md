@@ -472,6 +472,132 @@ Minimum isi dan perilaku berikut berlaku untuk seluruh M-01 sampai M-15:
   checksum/migration/tenant/evidence reference tanpa mengubah histori; critical
   alert, audit, backup/restore, dan runbook drill memiliki bukti timestamp.
 
+### 4.8 Kontrak delivery core system
+
+Bagian ini menerjemahkan “real work, completed, full feature” menjadi kontrak
+delivery yang dapat diperiksa. Modul tidak dianggap selesai karena halaman UI,
+route handler, tabel database, atau happy path telah dibuat. Modul selesai hanya
+ketika alur bisnisnya dapat dimulai dari kondisi nyata, menghasilkan output yang
+bersumber, menangani seluruh kegagalan yang diketahui, dan dapat dipulihkan oleh
+role yang berwenang tanpa SQL manual atau perubahan data langsung.
+
+#### 4.8.1 Definisi completion yang mengikat
+
+Setiap modul M-01 sampai M-15 wajib memiliki satu atau lebih
+`CapabilityRecord` dengan status terpisah. Capability yang belum siap tidak boleh
+menahan modul lain secara diam-diam dan tidak boleh ikut menghasilkan status
+customer-facing. Sebuah modul hanya boleh diberi label internal `completed` bila
+semua capability wajibnya memenuhi seluruh kondisi berikut:
+
+| Gate | Syarat lulus |
+|---|---|
+| Product outcome | Hasil bisnis, non-goals, aktor, role, tenant scope, dan limitation disetujui Product/Security |
+| Source of truth | Satu owner data ditetapkan; tidak ada modul lain yang menulis tabel sumber secara langsung |
+| Lifecycle | State, transition guard, terminal state, retry, timeout, cancel, archive/delete, recovery, dan rollback diuji |
+| Interface | Command/query/event memiliki schema version, authorization, idempotency, pagination/limit, dan error envelope |
+| Truth & provenance | Output memiliki actor/provider, scope, version, timestamp, correlation ID, dan referensi bukti |
+| Failure visibility | Empty, stale, partial, timeout, permission, provider, schema, conflict, dan system failure terlihat dengan CTA pemulihan |
+| Security | Tenant isolation, least privilege, replay, privilege escalation, secret leakage, signed access, dan audit diuji |
+| Resilience | Queue/lock/retry/circuit breaker, backup/restore atau recovery yang relevan, serta failure drill lulus |
+| User journey | UI dan API menyelesaikan alur dari create/configure sampai inspect/export/close untuk semua role yang diizinkan |
+| Operations | SLO, metric, alert, cost ceiling, runbook, on-call owner, dan incident evidence tersedia |
+| Proof | CI evidence, sandbox/manual evidence, capability diff, reviewer independen, expiry/reverification, dan customer limitation tersedia |
+
+`completed` bukan status yang dapat diatur frontend. Untuk publikasi, status
+operasionalnya tetap `live_verified` pada setiap capability. Jika salah satu gate
+gagal, status harus `not_implemented`, `verification_required`, atau `degraded`
+sesuai §6.4; hasil lama tidak boleh dipromosikan menjadi selesai.
+
+#### 4.8.2 Matriks kontrak per modul utama
+
+| Modul | Scope full-feature yang wajib selesai | Source of truth dan terminal sukses | Kegagalan yang wajib terlihat |
+|---|---|---|---|
+| M-01 Identity, Organization & RBAC | Auth event sync, membership multi-organisasi, invite, role, ownership transfer, MFA enforcement, session revoke, org switch, audit | Identity provider untuk autentikasi; `OrganizationMembership` untuk authorization; membership `active`, session revoked, audit tersimpan | invite expired/replayed, suspended/revoked member, MFA missing, session revoked, cross-tenant, ownership conflict |
+| M-02 Integration & Credential | Connect, verify, permission preview, health, reconnect, revoke, credential reference rotation, provider-specific limitation | `Integration` dan encrypted credential reference; `verified` hanya setelah verification contract lulus | invalid credential, 401/403, insufficient permission, expired token, revoked connection, rate limit, verification timeout |
+| M-03 Scan & Job Orchestrator | Schedule, Scan Now, queue, lease, progress, per-check outcome, cancel, retry, dead-letter, circuit breaker, recovery | `ScanRun`/job ledger append-only; run terminal `completed`, `partial`, `failed`, atau `cancelled` | duplicate/replay, stuck lease, backlog, timeout, partial coverage, dead-letter, worker loss, provider outage |
+| M-04 Provider Connector | Versioned adapter, endpoint/permission matrix, pagination, schema validation, redaction handoff, deterministic check registry, sandbox verification | Provider response setelah redaction + `ProviderContract`/`CheckDefinition` version | schema drift, unsupported endpoint, pagination gap, provider error, permission error, deprecated API, unverified check |
+| M-05 Evidence Vault & Integrity | Immutable write, canonicalization, hash, WORM/retention, legal hold, scoped read/download, verify, quarantine, re-collection | Object storage content-addressed evidence + DB reference/hash; evidence final immutable | redaction/schema failure, hash mismatch, missing object, expired URL, legal hold conflict, unauthorized access |
+| M-06 Finding, Control & Scoring | Deterministic evaluation, finding per resource, mapping, projection rebuild, freshness/coverage, versioned score, explainable drill-down | Append-only `Finding`/`ObservedFact`; `OrgControlStatus` dan score adalah rebuildable projection | missing evidence, stale/partial/error, denominator change, rule version mismatch, invalid N/A, rebuild mismatch |
+| M-07 Remediation & Human Review | Guidance version, assignment, SLA, comments, blocked state, fix evidence, re-scan verification, reopen, close/archive, approval | Remediation workflow + latest verified finding/evidence; close hanya dari verification | unauthorized owner, overdue, stale fix evidence, close without re-scan, reopen conflict, rejected approval |
+| M-08 Dashboard & Customer App | Onboarding, integrations, score, control/finding/evidence/remediation drill-down, empty/error/degraded states, role-aware i18n | Read models tenant-scoped dari M-01–M-07; tidak ada local compliance truth | no data, loading/queued, stale, partial, provider error, missing capability, locale missing, forbidden scope |
+| M-09 Report & Export | Snapshot request, queued generation, deterministic PDF/CSV, provenance appendix, signed access, expiry/revoke, export audit | Versioned `ReportSnapshot` dari snapshot data yang sama dengan UI | generation failure, snapshot mismatch, expired/revoked access, missing citation, reader incompatibility |
+| M-10 Notification & Alert | Rule/policy, preferences, quiet hours, channel adapter, dedupe, retry, escalation, acknowledgement, delivery evidence | Notification ledger dan provider delivery receipt; finding tidak diubah oleh delivery | duplicate event, opt-out conflict, provider outage, rate limit, dead-letter, latency breach, redaction failure |
+| M-11 Policy, Risk, Vendor & Regulation | Versioned records, review/approval, mapping, reminders, risk treatment, vendor lifecycle, official-source monitor, impact propagation | Versioned policy/risk/vendor/regulation records; approval/publish ledger | unreviewed draft, source unavailable, hash change, stale review, mapping conflict, unauthorized publish |
+| M-12 Trust Page & Auditor Portal | Scoped publication, capability/evidence eligibility, time-bound read-only access, revoke/unpublish, citations, audit | `TrustPublication`/`AuditorAccess` policy dan eligible live evidence | expired/stale evidence, unverified capability, scope escalation, revoked link, demo leakage, unpublish history loss |
+| M-13 Billing & Entitlement | Catalog version, checkout, signature-verified inbox, subscription state machine, entitlement enforcement, renewal/failure/cancel/refund, reconciliation | Provider webhook inbox + subscription ledger; entitlement projection server-side | replay/out-of-order webhook, signature failure, payment mismatch, grace-period ambiguity, unauthorized feature access |
+| M-14 AI Gateway & Assistants | Scoped retrieval, redaction, model routing, schema/citation verification, refusal, human approval, usage/cost budget, deletion | Retrieval/evidence source dan `AiUsageLog`; AI tidak memiliki compliance write authority | prompt injection, insufficient evidence, invalid citation, cross-tenant retrieval, unsafe fallback, budget exceeded, provider outage |
+| M-15 Admin, Observability & Operations | Capability registry, release diff, queue controls, incidents, SLO/cost, backup/restore, checksum, migration, runbook, emergency disable | Operational ledger, telemetry, backup manifest, incident record; tidak mengubah business history | alert loss, restore mismatch, checksum failure, migration failure, runaway cost, missing audit, unsafe operator action |
+
+M-02 dan M-04, serta pasangan lain yang ditulis bersama di tabel readiness,
+tetap wajib memiliki dossier dan `CapabilityRecord` terpisah. Pengelompokan hanya
+untuk urutan pembahasan, bukan alasan untuk melewati gate salah satu modul.
+
+#### 4.8.3 Dossier completion wajib
+
+Sebelum modul atau capability berubah ke `live_verified`, repository harus
+memiliki `DOC/completion/<moduleId>/` dengan isi minimal:
+
+```text
+README.md                  # scope, non-goals, owner, limitation, dependency
+contract.md                # command/query/event/schema/error/state machine
+permission-matrix.md       # role, endpoint/check, minimum permission, deny case
+test-matrix.md             # expected result dan evidence untuk seluruh failure class
+proof-record.md            # commit, CI runs, sandbox, reviewer, verifiedAt, expiresAt
+runbook.md                 # operate, recover, rollback, customer communication
+```
+
+`proof-record.md` harus menghubungkan setiap acceptance criterion ke bukti yang
+dapat dibuka ulang: test ID, log ter-redact, fixture/sandbox reference, screenshot
+atau export bila relevan, dan reviewer. Bukti yang hanya berupa assertion developer,
+data seed, screenshot dari sample data, atau klik manual tanpa expected result
+tidak cukup. Dossier dapat ditunda selama fase perencanaan, tetapi wajib tersedia
+sebelum coding capability dimulai pada Definition of Ready dan lengkap sebelum
+release gate.
+
+### 4.9 Urutan pembangunan dan dependency gate
+
+Urutan berikut adalah dependency DAG, bukan daftar fitur yang boleh dilewati.
+Setiap slice harus selesai end-to-end sebelum slice berikutnya menerima status
+`live_verified`.
+
+| Slice | Modul | Exit gate yang harus dibuktikan |
+|---|---|---|
+| S0 Foundation truth | M-01 + capability foundation M-15 | Multi-org membership, authz server-side, audit, migration, secret redaction, backup/restore smoke, CI, dan hosting verification |
+| S1 Evidence vertical slice | M-02 + M-03 + M-04 + M-05 | AWS cross-account verify, minimal satu check nyata, queue/lock/retry, immutable evidence, hash re-verify, permission denial, schema drift |
+| S2 Decision system | M-06 + M-07 | Rebuild projection identik, freshness/coverage, no-error-to-pass, remediation re-scan, close/reopen, tenant/security regression |
+| S3 Customer operating surface | M-08 + M-09 + M-10 | UI/API parity, empty/error/degraded copy, deterministic report, signed access, dedupe/delivery latency, audit |
+| S4 Governance surface | M-11 + M-12 | Human approval, official-source provenance, scoped/time-bound auditor access, stale/demo exclusion, publish/revoke |
+| S5 Commercial and assistant surface | M-13 + M-14 | Webhook inbox/reconciliation, entitlement deny test, citation/refusal golden set, cost ceiling, provider fallback safety |
+| S6 Operational readiness | M-15 full scope | Incident exercise, restore drill, queue controls, SLO telemetry, capability diff, on-call/runbooks, GA sign-off |
+
+Dependency yang belum `live_verified` membuat capability dependent tetap
+`verification_required`, bukan `experimental` yang diam-diam dipakai di
+production. Sebuah slice tidak boleh dirilis hanya karena jumlah endpoint atau
+persentase test coverage tercapai; seluruh exit gate pada tabel harus memiliki
+proof record.
+
+### 4.10 Definition of Ready per modul dan Definition of Done per release
+
+Sebelum modul mulai dibangun, Product, Engineering, Security, dan Operations
+harus menandatangani satu Module Contract yang menjawab:
+
+1. Apa hasil bisnis yang dapat diverifikasi dan apa yang sengaja tidak dilakukan?
+2. Siapa owner source of truth, actor, role, tenant scope, dan data classification?
+3. Apa state machine lengkap serta transition guard untuk command UI/API/job?
+4. Apa schema request/response/event, idempotency key, concurrency rule, dan
+   error code yang stabil?
+5. Bagaimana freshness, coverage, provenance, retention, audit, rollback, dan
+   deletion/legal hold bekerja?
+6. Bagaimana provider outage, partial result, schema drift, replay, restore
+   failure, dan cross-tenant attempt diuji?
+7. Apa SLO, cost ceiling, alert, runbook, customer limitation, dan expiry proof?
+
+Release hanya boleh menyatakan core system `completed` jika seluruh slice yang
+termasuk release mempunyai dossier lengkap, semua dependency berada pada status
+yang diizinkan, seluruh capability customer-facing `live_verified`, dan tidak ada
+critical/high finding terbuka yang memengaruhi kebenaran data, tenant isolation,
+credential safety, evidence integrity, payment reconciliation, atau AI safety.
+
 ---
 
 ## 5. Keputusan Arsitektur

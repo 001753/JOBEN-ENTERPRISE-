@@ -5,9 +5,10 @@
 **Kategori:** Compliance Automation & Trust Management Platform  
 **Domain target:** `jobenapp.cloud`  
 **Dokumen kanonik:** `/DOC/PRD-JOBEN-ENTERPRISE.md`  
-**Versi:** 5.2 — Core System Delivery Readiness Contract
+**Versi:** 5.3 — Global-Ready Core, Indonesia/Asia MVP Contract
 **Status:** Baseline engineering; implementasi hanya boleh mengklaim capability yang telah melewati gate pada §24
 **Bahasa dokumen:** Bahasa Indonesia; istilah standar teknis dan compliance mengikuti istilah resmi  
+**Strategi go-to-market:** Core system global-ready by design; MVP pertama diluncurkan untuk Indonesia/Asia
 **Sumber konsolidasi:** PRD master v3.0 dan Addendum Scan & Continuous Control Monitoring v1.0
 
 **Status repository saat ini:** dokumen PRD ini sudah direvisi sebagai baseline
@@ -40,7 +41,7 @@ engineering yang harus ditutup:
 | AI hanya diberi aturan disclaimer | Model masih dapat mengarang fakta dan sitasi | Retrieval wajib citation-backed, output schema, refusal, dan evaluator anti-hallucination |
 | Tenant isolation hanya dijelaskan sebagai tanggung jawab service | Satu query lupa filter dapat menjadi IDOR | Authorization policy terpusat, scoped repository, negative tests, dan RLS bila tersedia |
 | Backup, restore, migration, incident response belum menjadi release gate | Sistem bisa jalan tetapi tidak dapat dipulihkan | RTO/RPO, restore drill, migration rollback, SLO, dan runbook wajib |
-| MVP mencakup terlalu banyak permukaan sekaligus | Scope besar menghambat validasi kebenaran | Satu vertical slice AWS read-only harus benar sebelum provider kedua |
+| MVP mencakup terlalu banyak permukaan sekaligus | Scope besar menghambat validasi kebenaran | Satu vertical slice AWS read-only harus benar sebelum provider kedua; global-readiness dibangun sebagai fondasi, bukan perluasan fitur MVP |
 
 ### 0.1 Aturan build yang mengikat
 
@@ -80,8 +81,9 @@ engineering yang harus ditutup:
 
 ## 1. Ringkasan Eksekutif
 
-JOBEN ENTERPRISE membantu startup, scale-up, dan enterprise di Indonesia/Asia
-mempercepat kesiapan SOC 2, ISO 27001, dan privacy readiness melalui:
+JOBEN ENTERPRISE adalah platform global-ready untuk membantu startup, scale-up, dan
+enterprise mempercepat kesiapan SOC 2, ISO 27001, dan privacy readiness. MVP
+pertama memvalidasi produk pada customer Indonesia/Asia melalui:
 
 1. pengumpulan evidence dari sistem nyata;
 2. pemantauan kontrol secara berkelanjutan;
@@ -90,7 +92,8 @@ mempercepat kesiapan SOC 2, ISO 27001, dan privacy readiness melalui:
 5. Trust Page dan Auditor Portal;
 6. Policy Center dan workflow review manusia;
 7. AI assistant yang menjelaskan data organisasi, bukan menciptakan fakta compliance;
-8. payment dan notifikasi yang sesuai kebutuhan pasar Indonesia.
+8. payment dan notifikasi yang sesuai kebutuhan pasar Indonesia/Asia, melalui
+   abstraction yang dapat diperluas ke provider dan region global.
 
 Nilai produk bukan dashboard yang terlihat meyakinkan, melainkan **kebenaran,
 ketertelusuran, dan integritas data**. Setiap status kontrol harus dapat ditelusuri
@@ -105,8 +108,34 @@ dapat diverifikasi.
   dengan target pengiriman di bawah 15 menit sejak deteksi.
 - Menyediakan satu sumber kebenaran untuk status kontrol, evidence, remediation,
   policy, dan readiness.
-- Menjadi produk B2B SaaS dengan paket Starter, Growth, dan Scale berbasis IDR.
+- Menjadi produk B2B SaaS dengan katalog plan, currency, tax, payment provider, dan
+  entitlement yang dapat dilokalkan; MVP memakai IDR dan provider Indonesia/Asia.
+- Membangun core system yang tidak terkunci pada satu region, currency, bahasa,
+  payment provider, notification provider, data-residency policy, atau framework.
 - Membantu JOBEN sendiri melakukan dogfooding menuju SOC 2 Type I lalu Type II.
+
+### 1.1.1 Strategi global-ready, regional-first
+
+Global-ready berarti capability inti dapat dipakai lintas negara tanpa migrasi data
+atau rewrite domain logic ketika region baru dibuka. Regional-first berarti
+availability provider, harga, bahasa, legal terms, regulatory mapping, support, dan
+data residency untuk MVP sengaja dibatasi pada Indonesia/Asia.
+
+Kontrak yang wajib berlaku sejak MVP:
+
+- seluruh organisasi memiliki `homeRegion`, `dataResidencyPolicy`, `defaultLocale`,
+  `timezone`, `currency`, dan `taxProfile` yang tersimpan di server;
+- waktu disimpan dalam UTC dan ditampilkan menurut timezone organisasi/user;
+- amount disimpan sebagai minor unit bersama ISO 4217 currency code; harga tidak
+  boleh berupa angka IDR yang hardcode di frontend;
+- provider, notification channel, AI model, object-storage region, dan framework
+  dipilih melalui registry/configuration versioned, bukan percabangan negara di UI;
+- data customer, evidence, export, log, dan AI retrieval tetap tenant-scoped serta
+  mengikuti policy region; perpindahan region adalah workflow terkontrol dengan
+  audit, consent/approval, dan rollback yang relevan;
+- customer-facing copy menjelaskan region dan capability yang benar-benar tersedia;
+  provider atau framework yang belum diverifikasi tetap `planned` atau
+  `verification_required`.
 
 ### 1.2 Batasan klaim
 
@@ -213,6 +242,9 @@ MFA wajib untuk akun internal dan role `OWNER`/`ADMIN` melalui Clerk.
 
 - Fondasi Next.js App Router + TypeScript + PostgreSQL + Prisma.
 - Auth Clerk dan multi-tenant organization.
+- Global-ready tenant, locale, timezone, currency, tax, region, provider registry,
+  dan feature/capability registry; MVP aktif pertama: market pack Indonesia/Asia
+  yang provider serta legal review-nya tersedia.
 - Framework SOC 2 Type II dengan control seed yang hanya dipetakan ke check
   berstatus `live_verified`.
 - Fase 1: satu vertical slice AWS cross-account IAM role, scan engine, evidence
@@ -221,7 +253,8 @@ MFA wajib untuk akun internal dan role `OWNER`/`ADMIN` melalui Clerk.
   gateway hanya setelah safety/contract gate lulus.
 - Google Workspace, public trust page, auditor portal, dan fitur regulasi tidak
   dianggap MVP live sebelum gate provider dan privacy masing-masing lulus.
-- i18n EN/ID/ZH dan cron terproteksi dikirim bertahap; string yang belum lengkap
+- i18n EN/ID/ZH dan cron terproteksi dikirim bertahap; MVP hanya mempublikasikan
+  locale yang telah lengkap untuk market pack aktif. String yang belum tersedia
   tidak boleh fallback diam-diam pada customer-facing release.
 
 ### 4.2 Out of scope MVP, tetapi disiapkan sebagai roadmap
@@ -231,7 +264,10 @@ MFA wajib untuk akun internal dan role `OWNER`/`ADMIN` melalui Clerk.
 - Questionnaire AI penuh untuk PDF/Excel/CSV.
 - PCI SAQ assistant.
 - White-label agency dan marketplace auditor.
-- Multi-currency non-IDR.
+- Checkout global dan multi-currency live; currency abstraction dan catalog schema
+  tetap wajib tersedia sejak MVP.
+- Global data residency, multi-region active/active, dan seluruh payment provider
+  internasional.
 - ASV scanning PCI-DSS.
 - Migrasi hosting ke VPS/cloud sebelum threshold traffic disepakati.
 
@@ -606,7 +642,9 @@ credential safety, evidence integrity, payment reconciliation, atau AI safety.
 
 Satu Next.js App Router untuk marketing site, customer app, dan Route Handlers API.
 Logic domain dipisahkan dalam service layer agar dapat diekstrak menjadi service
-terpisah setelah migrasi hosting.
+terpisah setelah migrasi hosting. Domain core tidak boleh mengetahui detail negara
+atau vendor secara langsung; detail tersebut masuk melalui registry dan adapter
+versioned.
 
 ```text
 jobenapp.cloud
@@ -617,13 +655,21 @@ app.jobenapp.cloud
   Auth, billing, integrations, scan, evidence, controls,
   regulations, AI gateway, notifications, i18n
 
+Global-ready control plane
+  Organization/region directory, capability registry, plan/catalog,
+  provider registry, policy/version registry, routing and audit
+
+Regional execution boundary
+  DB/object-storage/queue/provider adapters selected by homeRegion and policy
+  MVP: Indonesia/Asia deployment boundary; future EU/US/APAC boundaries
+
 External services
-  PostgreSQL        persistent application data
-  Redis managed     BullMQ on-demand queue
-  S3/R2             immutable evidence and report storage
+  PostgreSQL        persistent application data, region-aware tenant metadata
+  Redis managed     BullMQ on-demand queue, region-scoped job routing
+  S3/R2             immutable evidence and report storage, region policy enforced
   cPanel Cron       scheduled job trigger
   Clerk             auth, MFA, SSO/SAML capability
-  Xendit/Midtrans   payment
+  Payment adapters  Xendit/Midtrans for MVP; global providers later
   Sentry            error tracking
 ```
 
@@ -640,13 +686,17 @@ External services
 | Realtime | SSE atau polling 5–15 detik; WebSocket bukan default |
 | Object storage | AWS S3 atau Cloudflare R2, encrypted at rest |
 | Auth | Clerk |
-| Payment | Xendit primary, Midtrans secondary, Duitku/iPaymu non-recurring |
+| Payment | Provider adapter contract; Xendit primary, Midtrans secondary, Duitku/iPaymu non-recurring for MVP; global providers added by region |
 | AI | Gemini, Groq, DeepSeek melalui AI Gateway |
-| i18n | next-intl, route `/en`, `/id`, `/zh` |
+| i18n | next-intl, locale registry and route `/en`, `/id`, `/zh`; locale availability is capability-gated |
 | Monitoring | Sentry dan status page eksternal |
 
-Perubahan dari keputusan ini memerlukan RFC tertulis. Opsi NestJS terpisah tidak
-digunakan sebelum hosting diverifikasi mendukung minimal dua Node.js app.
+Setiap adapter provider wajib mengimplementasikan kontrak domain yang sama untuk
+connectivity, verification, error taxonomy, idempotency, webhook/event mapping,
+rate-limit handling, dan audit. Pergantian atau penambahan provider tidak boleh
+mengubah source of truth core system. Perubahan arsitektur dari keputusan ini
+memerlukan RFC tertulis. Opsi NestJS terpisah tidak digunakan sebelum hosting
+diverifikasi mendukung minimal dua Node.js app.
 
 ### 5.3 Gate hosting sebelum pembangunan yang bergantung pada hosting
 
@@ -1649,7 +1699,10 @@ Lead yang qualified dikirim ke sales sesuai consent dan policy privacy.
 
 ### 14.1 Pricing
 
-Harga berasal dari tabel `Plan`, bukan hardcode frontend. Seed awal:
+Harga berasal dari tabel versioned `Plan`/`Price`, bukan hardcode frontend. Setiap
+price memiliki `currency` ISO 4217, minor-unit amount, billing interval, tax
+behavior, region/market eligibility, effective period, dan provider mapping.
+Seed MVP awal:
 
 | Plan | Bulanan | Tahunan | Framework | Integrasi |
 |---|---:|---:|---:|---:|
@@ -1657,21 +1710,29 @@ Harga berasal dari tabel `Plan`, bukan hardcode frontend. Seed awal:
 | Growth | sekitar Rp7,7 juta | sekitar Rp74 juta | 3 | unlimited |
 | Scale | custom, mulai sekitar Rp14 juta | custom | unlimited | unlimited |
 
-Angka adalah starting point dan wajib direview sebelum GA.
+Angka adalah starting point dalam IDR dan wajib direview sebelum GA. Core system
+tidak boleh mengasumsikan IDR sebagai currency universal; customer yang belum
+memiliki market/currency price yang diverifikasi tidak boleh checkout.
 
 ### 14.2 Payment
 
-Xendit primary untuk checkout Starter/Growth, Midtrans secondary, Duitku/iPaymu
-untuk non-recurring. Callback wajib memverifikasi signature/token resmi provider.
-Jangan menyimpan data kartu mentah. Status subscription dan transaction harus
-idempotent terhadap webhook duplikat.
+Payment memakai provider adapter dan routing berdasarkan market, currency, dan
+plan. Untuk MVP: Xendit primary untuk checkout Starter/Growth, Midtrans secondary,
+dan Duitku/iPaymu untuk non-recurring. Provider global (misalnya kartu/invoice
+internasional) hanya boleh diaktifkan setelah adapter contract, merchant/legal
+review, tax, currency, webhook, refund, dan reconciliation gate lulus.
+Callback wajib memverifikasi signature/token resmi provider. Jangan menyimpan data
+kartu mentah. Status subscription dan transaction harus idempotent terhadap
+webhook duplikat, out-of-order event, retry, refund, chargeback, dan cancellation.
 
 ### 14.3 Regulation monitor
 
-Cron harian 06:00 UTC memeriksa sumber resmi AICPA, ISO, PCI SSC, EDPB, dan CPPA.
-Perubahan hash membuat `RegulationUpdate` berstatus `pending_review`. Gemini
-membuat `aiDraftSummary`; staff GRC mengedit, memvalidasi, mengisi `reviewedBy`,
-dan map ke controls. Setelah valid:
+Cron harian 06:00 UTC memeriksa sumber resmi yang terdaftar dalam
+`RegulationSourceRegistry`, dengan policy pack per framework dan market. MVP
+memulai dari AICPA, ISO, PCI SSC, EDPB, CPPA, dan sumber Indonesia/Asia yang
+disetujui. Perubahan hash membuat `RegulationUpdate` berstatus `pending_review`.
+Gemini membuat `aiDraftSummary`; staff GRC mengedit, memvalidasi, mengisi
+`reviewedBy`, dan map ke controls. Setelah valid:
 
 - control terdampak organisasi menjadi `needs_review`;
 - notifikasi dikirim ke customer;
@@ -1679,9 +1740,11 @@ dan map ke controls. Setelah valid:
 
 ### 14.4 Notifications
 
-Channel: in-app, email, dan WhatsApp Business API setelah vendor dan budget
-disetujui. Semua notification memiliki delivery status, retry policy, dan audit
-timestamp. Critical drift target <15 menit.
+Channel adalah adapter: in-app dan email untuk baseline; WhatsApp Business API
+untuk MVP setelah vendor dan budget disetujui; channel regional/global lain hanya
+diaktifkan setelah delivery, privacy, consent, retry, dan cost gate lulus. Semua
+notification memiliki delivery status, retry policy, dedupe key, market/channel
+policy, dan audit timestamp. Critical drift target <15 menit.
 
 ---
 
@@ -1698,8 +1761,14 @@ timestamp. Critical drift target <15 menit.
 - Retry transient dengan backoff; tidak retry buta untuk auth/permission.
 - Provider API call log mencatat endpoint, status, durasi, dan correlation ID.
 - Backup database harian, retensi 30 hari, diuji restore.
-- Data residency organization mendukung region EU/US/ID/APAC sesuai kapabilitas
-  vendor yang diverifikasi.
+- Data residency organization mengikuti `homeRegion` dan `dataResidencyPolicy`.
+  MVP memakai region Indonesia/Asia yang telah diverifikasi. EU/US/APAC hanya
+  boleh dipilih bila DB, object storage, queue, logs, AI retrieval, backup,
+  support access, dan deletion flow di region tersebut sudah diverifikasi.
+- Region boundary, cross-region transfer, subprocessors, legal basis, retention,
+  export, deletion, dan customer-visible limitation wajib memiliki policy version
+  serta audit record. Tidak ada cross-region fallback diam-diam untuk restricted
+  data.
 - Pentest independen sebelum GA.
 - Sentry tidak boleh menangkap token, raw credential, atau evidence sensitif.
 - Data diklasifikasikan minimal `public`, `internal`, `confidential`, dan
@@ -1722,7 +1791,7 @@ NFR baseline:
 | Scan queue start p95 | <5 menit saat backlog normal |
 | Normal sync | maksimal 6 jam sejak perubahan sumber, jika provider dan scheduler tersedia |
 | Critical alert | p95 delivery <15 menit sejak deteksi; 100% dicatat sukses/gagal |
-| UI locale | 100% EN/ID/ZH sebelum GA |
+| UI locale | 100% dari setiap locale yang dipublikasikan; MVP EN/ID, ZH hanya bila market pack locale lulus |
 | AI cost | seluruhnya terukur via `AiUsageLog` |
 | RPO database | ≤24 jam pada Fase 1; ≤1 jam sebelum GA jika provider mendukung |
 | RTO customer read path | ≤4 jam Fase 1; ≤2 jam sebelum GA |
@@ -1742,10 +1811,12 @@ status pass. SLO diukur dari telemetry yang dapat diaudit, bukan estimasi.
 - Struktur app, UI package, config, CI.
 - Hosting verification.
 - PostgreSQL + Prisma migration baseline.
+- Global-ready organization profile: home region, data residency policy, locale,
+  timezone, currency, tax profile, provider/capability registry, dan versioning.
 - Redis connectivity test.
 - Clerk, Xendit sandbox, Sentry.
 - Cron dummy endpoint.
-- Locale folders dan common strings.
+- Locale folders, common strings, locale completeness check, dan UTC/timezone test.
 - Domain/SSL plan.
 
 **Gate**
@@ -1755,6 +1826,8 @@ status pass. SLO diukur dari telemetry yang dapat diaudit, bukan estimasi.
 - Migration berhasil.
 - Redis test berhasil.
 - Cron memanggil endpoint dan tercatat.
+- Tidak ada currency/region/provider hardcode pada domain core.
+- Tenant region policy dan locale/timezone tersimpan serta diuji.
 - Semua blocker hosting terdokumentasi.
 
 ### Fase 1 — AWS evidence vertical slice, minggu 4–8
@@ -1788,6 +1861,9 @@ status pass. SLO diukur dari telemetry yang dapat diaudit, bukan estimasi.
   internal operations dashboard, dan SLO alert.
 - Billing sandbox terpisah dari scan truth; payment tidak menjadi syarat untuk
   memalsukan atau membuka status scan.
+- MVP market pack Indonesia/Asia: price catalog IDR, payment routing, invoice/tax
+  policy, notification channel, locale, data-residency limitation, dan
+  customer-facing capability copy.
 
 **Gate:** contract test, sandbox comparison, negative permission test, provider
 schema drift test, restore drill, dan incident runbook lulus. Fitur yang belum
@@ -1802,34 +1878,50 @@ lulus tetap `not_implemented`/`verification_required`.
 - WhatsApp critical alerts.
 - JOBEN dogfooding SOC 2 Type I.
 
-### Fase 3 — ISO 27001, minggu 18–23
+### Fase 3 — Global expansion readiness, setelah MVP regional
+
+- Market-pack framework untuk target region berikutnya dengan owner, legal basis,
+  provider matrix, language, pricing/currency/tax, support, dan data-residency
+  proof.
+- Global payment adapter dan reconciliation untuk market yang disetujui.
+- EU/US/APAC region verification, termasuk backup, logs, AI, subprocessors, and
+  deletion/transfer controls.
+- SSO/SAML dan enterprise identity/provider contracts sesuai target market.
+- Global support/SLO, status communication, and incident coverage.
+
+**Gate:** satu market/region baru tidak boleh live hanya karena UI translated.
+Region tersebut wajib memiliki provider sandbox comparison, privacy/legal review,
+residency evidence, billing reconciliation, locale completeness, support runbook,
+cross-region isolation test, dan independent reviewer sign-off.
+
+### Fase 4 — ISO 27001, setelah region expansion gate
 
 - 93 Annex A controls.
 - Reuse mapping SOC 2/ISO.
 - Gap analysis.
 - Connector Azure/GCP/Okta/Vercel/Supabase/Firebase.
 
-### Fase 4 — GDPR/CCPA, minggu 24–29
+### Fase 5 — GDPR/CCPA, setelah privacy/regional readiness
 
 - PII data map, cookie scanner, DSAR, DPA, vendor risk, breach timer 72 jam.
 
-### Fase 5 — Questionnaire AI, minggu 30–35
+### Fase 6 — Questionnaire AI, minggu 30–35
 
 - Riset biaya provider terlebih dahulu.
 - Upload PDF/Excel/CSV, parsing, evidence matching, confidence score.
 - Human review dan `humanApproved` sebelum send/export.
 
-### Fase 6 — PCI SAQ assistant, minggu 36–39
+### Fase 7 — PCI SAQ assistant, minggu 36–39
 
 - Wizard pemilihan SAQ dan readiness checklist.
 - Tidak membangun ASV scanning.
 
-### Fase 7 — White-label dan auditor marketplace, minggu 40–43
+### Fase 8 — White-label dan auditor marketplace, setelah global expansion gate
 
 - Agency multi-tenant, custom branding, sub-organization.
 - Marketplace hanya sebagai penghubung, bukan penjamin kualitas auditor.
 
-### Fase 8 — Hardening dan GA, minggu 44–47
+### Fase 9 — Hardening dan GA, setelah seluruh target release gate
 
 - Pentest, remediasi critical/high.
 - Load test sesuai kapasitas shared hosting nyata.
@@ -2093,6 +2185,13 @@ dapat diaudit; support/runbooks aktif; tidak ada critical security finding.
 nyata, restore drill berkala, incident exercise, legal/privacy review, pricing/
 billing reconciliation, SLO dashboard, dan owner on-call disetujui.
 
+**Gate E — Region/market expansion:** sebelum market pack baru dipublikasikan,
+provider dan framework yang diklaim live memiliki contract/sandbox evidence,
+residency dan transfer policy diverifikasi, locale lengkap, pricing/currency/tax
+reconciliation lulus, subprocessors/AI/log/backup/deletion tercakup, support dan
+incident runbook aktif, cross-region isolation diuji, serta reviewer independen
+menyetujui proof record dan expiry/reverification date.
+
 Kegagalan gate menghentikan release. Tim wajib menurunkan capability ke
 `not_implemented`, `verification_required`, atau `degraded`; tidak boleh mengganti
 hasil dengan sample data atau menampilkan optimistic score.
@@ -2107,6 +2206,7 @@ hasil dengan sample data atau menampilkan optimistic score.
 | 5.0 | Kritik dan hardening evidence-first: provenance, freshness/coverage, immutable evidence, AI safety contract, tenant/API security, vertical-slice roadmap, operational runbooks, dan release gates. |
 | 5.1 | Penambahan peta readiness 15 modul utama, kontrak kelengkapan lintas modul, lifecycle/state machine, acceptance behavior, dan dependency gate agar `full feature` tidak disamakan dengan CRUD atau placeholder. |
 | 5.2 | Penguatan core-system delivery: completion matrix M-01–M-15, dossier proof wajib, dependency slices, multi-organization canonical model, state machine/event contract, endpoint coverage, concurrency, dan ledger integrity. |
+| 5.3 | Core system global-ready dengan MVP regional-first: tenant region policy, locale/timezone/currency/tax abstraction, provider adapter/registry, residency boundary, market-pack, dan Gate E ekspansi region. |
 
 Perubahan besar terhadap keputusan final memerlukan RFC baru dan pembaruan versi
 dokumen ini. `/DOC/PRD-JOBEN-ENTERPRISE.md` tetap menjadi sumber kebenaran terbaru

@@ -1,0 +1,118 @@
+Set up the imported project
+The user just imported this project from a GitHub repository. It could be anything — an app to run on Replit, a library, a fork to study, code to reuse — so the first thing to do is ask what they want; everything after depends on the answer.
+
+
+9 actions
+This repository is JOBEN ENTERPRISE — a compliance automation & trust management platform. Right now it contains only documentation: a detailed PRD and a phased build roadmap, but no application code yet.
+
+A few things worth noting:
+
+The stack planned is Next.js App Router + TypeScript + Prisma/PostgreSQL + Clerk auth
+Phase 0 (Foundation) is the starting point before any real app work can begin
+The roadmap has strict gates — nothing is built without verified data sources and proper evidence
+
+Worked for 36 seconds
+
+Pasted-Saya-bandingkan-secara-strategis-berdasarkan-scope-PRD-_1786376378529.txt
+ada perubahan prd. sesuaikan/perbaiki phase sesuai dngan prd. kerjakan dengan presisi tingi. jangan build apapun,
+
+7 minutes ago
+Saya akan membaca perubahan PRD yang diunggah, membandingkannya dengan PRD dan roadmap saat ini, lalu hanya memperbarui dokumen fase/roadmap yang terdampak—tanpa membuat aplikasi, memasang dependency, atau mengubah workflow. Setelah itu saya akan memeriksa konsistensi traceability dan gate.
+
+
+4 actions
+Saya sudah menemukan bahwa PRD kanonik memang sudah berada di versi 5.3 dan telah memuat kontrak global-ready core, Indonesia/Asia MVP. Roadmap masih versi 2.0 dan belum sepenuhnya memetakan perubahan itu, jadi saya akan menelusuri bagian PRD yang berubah serta semua phase/gate roadmap yang relevan sebelum melakukan patch dokumentasi.
+
+
+4 actions
+Perbandingan awal menunjukkan gap utama ada pada kontrak phase, bukan pada implementasi: roadmap belum memiliki owner/work package/acceptance yang eksplisit untuk global-ready core, market-pack Indonesia/Asia, region policy, currency/tax/locale abstraction, provider registry, residency boundary, dan Gate E yang sudah diwajibkan PRD v5.3. Saya akan memetakan titik-titik itu ke Phase 0, 1B, 2, 4, 5, 8, serta menambah phase ekspansi yang jelas tanpa memperluas MVP.
+
+
+14 actions
+Saya akan menyelaraskan roadmap secara struktural, bukan sekadar mengganti nomor: menambahkan Phase 3 khusus global expansion readiness sesuai PRD v5.3, menggeser ISO/privacy/AI/PCI/white-label/GA menjadi Phase 4–9, lalu memperbarui dependency, gate, traceability, ownership matrix, exit register, work package, dan milestone. Ini tetap perubahan dokumentasi saja.
+
+
+8 actions
+Pemeriksaan menemukan beberapa referensi lama yang harus ikut digeser agar tidak menimbulkan kontradiksi: header phase masih menyebut ISO sebagai Phase 3, tabel ownership/exit register belum punya kolom global expansion, dan work package/milestone belum mencerminkan Gate E. Saya rapikan seluruh referensi itu sekarang, termasuk aturan traceability PRD §16 dan status fase GA.
+
+
+2 actions
+Saya lanjutkan penyelarasan referensi internal roadmap: phase baru sudah ditambahkan, dan sekarang saya memperbarui register traceability, ownership matrix, exit proof, work breakdown, serta milestone agar setiap capability menunjuk ke nomor phase baru yang benar. Setelah patch, saya akan menjalankan pemeriksaan istilah/nomor silang dan diff dokumen.
+
+
+Show less
+
+Edited BUILD-ROADMAP.md
+
+Opened BUILD-ROADMAP.md
+
+Searched for "P1–P8|P2–P8|P5–P7|P8 re…"
+
+Viewed code changes
+Validasi menemukan dua jenis inkonsistensi dokumentasi: whitespace pada metadata Markdown, dan tabel phase lama yang masih menggeser ISO/privacy/AI/PCI/marketplace satu phase terlalu awal. Saya akan memperbaiki keduanya sekaligus; tidak ada perubahan kode atau konfigurasi runtime.
+
+
+Edited BUILD-ROADMAP.md
+Saya menemukan satu gap substantif terakhir: setelah Phase 3 baru ditambahkan, isi matrix modul dan exit register masih memakai urutan lama, sehingga ISO/privacy/AI/PCI akan tampak berada di phase yang salah. Saya akan menggeser seluruh mapping itu satu posisi, menambahkan work package market expansion, dan menjaga Gate D (GA) tetap terpisah dari Gate E (market/region).
+
+Inspecting task completion
+
+Inspecting task completion
+Patch gabungan terakhir tidak masuk karena konteks tabel berubah setelah patch sebelumnya; tidak ada perubahan parsial dari patch itu. Saya akan memecahnya menjadi patch kecil yang terverifikasi per bagian supaya mapping Phase 3–9 tidak salah.
+
+
+Show less
+
+Opened BUILD-ROADMAP.md
+
+Opened BUILD-ROADMAP.md
+
+Viewed code changes
+Fixing tables and next steps
+
+Fixing tables and next steps
+
+Edited BUILD-ROADMAP.md
+Planning next steps
+
+Planning next steps
+
+Edited BUILD-ROADMAP.md
+Checking PRD details
+
+Checking PRD details
+Mapping phase dan exit register sudah diperbaiki. Saya tinggal menyelesaikan konsistensi akhir pada dua area: format cross-cutting control pack (kolom Phase 3 harus eksplisit) dan urutan work package/milestone agar global expansion tidak tertinggal atau tertukar dengan governance.
+
+
+Show less
+
+Opened BUILD-ROADMAP.md
+
+Opened BUILD-ROADMAP.md
+
+Viewed code changes
+Refining process instructions
+
+Refining process instructions
+
+Edited BUILD-ROADMAP.md
+Updating deliverables and documentation
+
+Updating deliverables and documentation
+Saya sudah menyelesaikan mapping phase dan menemukan satu isu format tabel serta backlog lama yang masih belum memasukkan work package ekspansi global. Saya akan memperbaiki formatnya, menambahkan WP khusus market-pack/Gate E sebelum ISO, lalu memperbarui milestone dan riwayat roadmap ke versi 3.0.
+
+
+2 actions
+Penyelarasan dokumen sudah diterapkan. Saya akan melakukan audit akhir terhadap nomor phase, tabel, dependency, dan referensi PRD v5.3; kemudian membaca prosedur follow-up yang diwajibkan sebelum menutup task. Tidak ada aplikasi yang dibangun.
+
+
+6 actions
+Audit akhir menemukan satu cacat presisi dokumentasi: heading subseksi masih memakai nomor fase lama setelah penambahan Phase 3, misalnya Phase 4 masih bertuliskan ## 3.1. Saya akan membetulkan penomoran heading itu agar navigasi dan referensi phase tidak ambigu, lalu menjalankan validasi Markdown/diff terakhir.
+
+
+Edited BUILD-ROADMAP.md
+Penomoran subseksi sudah dirapikan. Saya melakukan validasi terakhir sekarang: memastikan hanya roadmap yang berubah, tidak ada whitespace/error format, jumlah kolom tabel konsisten, dan semua phase/gate global-ready tercermin tanpa membangun aplikasi apa pun.
+
+
+4 actions
+Dokumentasi sudah konsisten dan tervalidasi: PRD v5.3 tetap tidak diubah, roadmap kini versi 3.0 dengan Phase 3 dan Gate E, serta seluruh dependency sampai GA sudah digeser. Saya tidak membangun aplikasi atau mengubah workflow. Saya akan mencatat dua langkah lanjutan opsional yang berada di luar scope dokumentasi ini, lalu menutup task.

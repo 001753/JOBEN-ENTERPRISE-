@@ -5,7 +5,7 @@
 **Kategori:** Compliance Automation & Trust Management Platform  
 **Domain target:** `jobenapp.cloud`  
 **Dokumen kanonik:** `/DOC/PRD-JOBEN-ENTERPRISE.md`  
-**Versi:** 5.0 — Evidence-First Production Baseline
+**Versi:** 5.1 — Complete Module Readiness Contract
 **Status:** Baseline engineering; implementasi hanya boleh mengklaim capability yang telah melewati gate pada §24
 **Bahasa dokumen:** Bahasa Indonesia; istilah standar teknis dan compliance mengikuti istilah resmi  
 **Sumber konsolidasi:** PRD master v3.0 dan Addendum Scan & Continuous Control Monitoring v1.0
@@ -280,6 +280,197 @@ Kriteria ini berlaku untuk scan, evidence, control, policy, risk, vendor,
 regulation, report, trust/auditor, notification, billing, AI, auth, dan
 operations. CRUD generik bukan definisi kelengkapan; state machine dan hasil
 bisnis yang dapat diverifikasi adalah definisinya.
+
+### 4.5 Peta readiness modul utama
+
+Tabel ini adalah baseline scope yang mengikat. `Full feature` berarti seluruh
+kapabilitas yang tercantum pada kontrak modul, bukan sekadar halaman, tabel, atau
+endpoint CRUD. Modul hanya boleh dipublikasikan bila status capability seluruh
+kapabilitas wajibnya `live_verified` dan seluruh dependency pada kolom terakhir
+juga `live_verified`.
+
+| ID | Modul | Hasil bisnis yang wajib tersedia | Status awal | Dependency minimum |
+|---|---|---|---|---|
+| M-01 | Identity, Organization & RBAC | sign-up/sign-in, MFA, organisasi, invite, role, session, revoke, tenant isolation, audit | `planned` | Auth provider, DB, audit |
+| M-02 | Integration & Credential | connect, verify, reconnect, revoke, least privilege, health, permission matrix, error recovery | `planned` | M-01, secret manager, provider contract |
+| M-03 | Scan & Job Orchestrator | scheduled/on-demand scan, queue, lock, retry, cancel, progress, partial result, recovery | `planned` | M-01, M-02, queue |
+| M-04 | Provider Connector | adapter versioned, API client, permission test, schema validation, deterministic checks, drift handling | `planned` | M-02, M-03, provider sandbox |
+| M-05 | Evidence Vault & Integrity | redact, canonicalize, hash, immutable storage, retention, verify, authorized access, legal hold | `planned` | M-01, M-03, object storage |
+| M-06 | Finding, Control & Scoring | evaluator, mapping, projection rebuild, freshness/coverage, score versioning, explainability | `planned` | M-03, M-04, M-05 |
+| M-07 | Remediation & Human Review | guidance, owner, due date, status workflow, comment, evidence of fix, re-scan, audit | `planned` | M-06, M-01 |
+| M-08 | Dashboard & Customer App | onboarding, integrations, score, control detail, evidence, empty/error/degraded state, i18n | `planned` | M-01, M-02, M-06, M-07 |
+| M-09 | Report & Export | queued PDF, provenance appendix, signed access, expiry, revocation, reproducible snapshot | `planned` | M-05, M-06, M-07 |
+| M-10 | Notification & Alert | rule, preference, channel, delivery, retry, dedupe, escalation, latency evidence | `planned` | M-03, M-06, notification provider |
+| M-11 | Policy, Risk, Vendor & Regulation | versioned records, review/approval, mapping, reminders, impact propagation, audit | `planned` | M-01, M-06, M-10, official sources |
+| M-12 | Trust Page & Auditor Portal | publish/unpublish, scope, expiry, read-only access, revocation, evidence citation, audit | `planned` | M-05, M-06, M-09 |
+| M-13 | Billing & Entitlement | plan catalog, checkout, webhook inbox, subscription state, entitlement enforcement, reconciliation | `planned` | M-01, payment provider, audit |
+| M-14 | AI Gateway & Assistants | scoped retrieval, citations, refusal, schema validation, human approval, usage/cost control | `planned` | M-01, M-05, M-06, AI provider |
+| M-15 | Admin, Observability & Operations | capability registry, incidents, queues, SLO, cost, backup/restore, runbooks, release control | `planned` | all production dependencies |
+
+Status `planned` pada tabel ini adalah status repository saat PRD ditulis, bukan
+klaim bahwa modul sudah tersedia. Setiap implementasi wajib memecah modul menjadi
+`CapabilityRecord` yang dapat dilacak ke requirement, commit, test evidence,
+operational evidence, reviewer, dan expiry. Mengubah status modul menjadi
+`completed` tanpa dossier completion tersebut adalah pelanggaran PRD.
+
+### 4.6 Kontrak kelengkapan setiap modul
+
+Setiap modul utama wajib memiliki dokumen kontrak tersendiri sebelum coding dan
+dossier completion sebelum release. Kontrak tidak boleh hanya menjelaskan UI.
+Minimum isi dan perilaku berikut berlaku untuk seluruh M-01 sampai M-15:
+
+1. **Boundary dan ownership:** tujuan, non-goals, owner, aktor, role matrix,
+   tenant scope, data classification, source of truth, dependency, dan public
+   limitation.
+2. **Lifecycle utuh:** command/query, state machine dengan transition guard
+   server-side, state terminal, retry, idempotency, cancellation, timeout,
+   archive/deletion, recovery, dan rollback yang relevan.
+3. **Kontrak teknis:** request/response schema versioned, error envelope dan
+   taxonomy, pagination, concurrency/lock, event/audit schema, retention,
+   freshness, coverage, SLO, rate/cost limit, dan observability.
+4. **User journey lengkap:** kondisi awal → konfigurasi → validasi → proses →
+   hasil → inspect/export/close; tersedia melalui UI dan API untuk role yang
+   diizinkan, tanpa SQL manual, feature flag tersembunyi, atau support override.
+5. **Kebenaran hasil:** hasil memiliki provenance, timestamp, version, actor/
+   provider, scope, dan bukti yang dapat diverifikasi. `loading`, `queued`,
+   `unknown`, `error`, `stale`, `partial`, `not_available`, dan `degraded`
+   tidak boleh dirender sebagai sukses.
+6. **Resilience dan security:** unauthorized, cross-tenant, replay, duplicate,
+   timeout, rate limit, provider outage, schema drift, secret leakage, privilege
+   escalation, dan restore failure diuji sebagai failure yang terlihat.
+7. **Completion evidence:** unit, integration, contract, E2E, security,
+   accessibility, localization, performance, manual sandbox, runbook drill,
+   metric/alert, screenshot atau export bila relevan, serta sign-off reviewer.
+
+### 4.7 Kontrak khusus modul utama
+
+#### M-01 — Identity, Organization & RBAC
+
+- **Alur wajib:** create account → verify identity/MFA → create/join organization
+  → invite → accept/revoke member → switch organization → sign out/revoke
+  session. Organization context selalu berasal dari session yang tervalidasi.
+- **State wajib:** `invited`, `active`, `suspended`, `revoked`, `deleted` untuk
+  membership; perubahan role dan transfer ownership harus memiliki approval dan
+  audit trail.
+- **Acceptance:** semua route, job, export, webhook, signed URL, dan repository
+  lulus negative test lintas tenant; MFA `OWNER`/`ADMIN` dan internal aktif;
+  kehilangan session atau membership langsung menghentikan akses.
+
+#### M-02/M-04 — Integration dan Provider Connector
+
+- **Alur wajib:** pilih provider → tampilkan permission dan limitation → connect →
+  verify identity/scope/permission → health check → scan → reconnect/revoke.
+  Credential asli tidak pernah masuk database, log, fixture, evidence, atau UI.
+- **Setiap adapter wajib memiliki:** provider API revision, endpoint matrix,
+  permission minimal per check, rate-limit strategy, timeout, pagination,
+  schema fixture, redaction rule, check registry, sandbox account, dan expiry
+  verifikasi.
+- **Acceptance:** revoked/insufficient permission menjadi `permission_error`;
+  401/403 tidak di-retry; transient error punya retry terbatas; schema drift
+  memblokir evaluasi terkait dan menjadi `verification_required`; reconnect
+  tidak menghapus histori.
+
+#### M-03 — Scan & Job Orchestrator
+
+- **Alur wajib:** schedule/Scan Now → idempotency check → queue → progress per
+  integration/check → evaluate → persist append-only result → aggregate →
+  notify → complete/partial/error.
+- **State wajib:** `queued`, `running`, `cancelling`, `completed`, `partial`,
+  `failed`, `cancelled`, `dead_letter`; hanya worker yang berwenang dapat
+  melakukan transition.
+- **Acceptance:** duplicate invocation menghasilkan satu run; cancel tidak
+  menghapus evidence; satu check/provider gagal tidak menghilangkan resource
+  lain; stuck lease dapat direcover; retry tidak menggandakan finding atau
+  notification; backlog, duration, dan failure reason terlihat operator.
+
+#### M-05 — Evidence Vault & Integrity
+
+- **Alur wajib:** collect → redact → schema validate → canonicalize → hash →
+  write immutable object → link observed fact/finding → authorized view/download
+  → periodic verify → quarantine/recapture jika integrity gagal.
+- **Acceptance:** hash yang berubah terdeteksi; object hilang menjadi incident;
+  record final tidak dapat di-update/delete; retention/legal hold ditegakkan;
+  signed URL pendek, scoped, dapat dicabut, dan setiap akses dicatat; secret
+  canary serta nested payload lulus redaction test.
+
+#### M-06 — Finding, Control & Scoring
+
+- **Alur wajib:** check version → observed fact → deterministic evaluation →
+  finding per resource → mapping → control projection → score snapshot →
+  explainable dashboard/report.
+- **Acceptance:** projection dapat direbuild dari append-only finding dan
+  menghasilkan hasil yang sama; error/stale/incomplete/missing evidence tidak
+  pernah menjadi pass; formula/version/denominator tersimpan; `not_applicable`
+  membutuhkan alasan dan permission; perubahan hasil dapat ditelusuri ke scan,
+  evidence, rule, dan waktu observasi.
+
+#### M-07 — Remediation & Human Review
+
+- **Alur wajib:** finding fail → guidance versioned → assign owner/due date →
+  acknowledge/in progress/blocked → attach fix evidence/comment → re-scan →
+  verify resolved atau reopen → close/archive.
+- **Acceptance:** hanya evidence dari scan terbaru yang dapat menutup finding;
+  owner yang tidak berwenang tidak dapat mengubah status; due date dan SLA
+  memicu reminder; AI note diberi label dan tidak menggantikan langkah manusia;
+  close/reopen memiliki actor, alasan, dan audit.
+
+#### M-08/M-09 — Dashboard, Customer App, Report & Export
+
+- **Alur wajib:** onboarding → lihat source/freshness/coverage → drill-down ke
+  finding/evidence/remediation → export snapshot yang sama dengan layar.
+- **Acceptance:** tanpa data tampilkan empty state, bukan score nol; queued,
+  error, partial, stale, dan degraded memiliki copy/CTA berbeda; semua count
+  berasal dari query tenant-scoped; PDF memiliki hash/timestamp/disclaimer,
+  hasil deterministik untuk input snapshot yang sama, dan akses kedaluwarsa.
+
+#### M-10 — Notification & Alert
+
+- **Alur wajib:** event eligible → preference/policy evaluation → dedupe key →
+  enqueue → provider delivery → retry/escalate → delivered/failed/acknowledged.
+- **Acceptance:** critical drift terukur <15 menit; duplikat webhook/job tidak
+  mengirim dua alert; opt-out dan quiet hour dihormati kecuali policy emergency;
+  delivery status dan provider response ter-redact; retry dan dead-letter dapat
+  dioperasikan tanpa mengubah finding.
+
+#### M-11/M-12 — Policy, Risk, Vendor, Regulation, Trust & Auditor
+
+- **Alur wajib:** draft → review → approve/publish → version → periodic review →
+  supersede/withdraw; trust/auditor publish hanya mengambil capability dan
+  evidence yang `live_verified`, scoped, belum expired, dan diizinkan.
+- **Acceptance:** AI tidak dapat publish; perubahan regulasi resmi memiliki
+  source/hash/reviewer dan dampak mapping; auditor access read-only, scope- dan
+  time-bound, dapat dicabut; unpublish tidak menghapus audit/history; public
+  output tidak pernah menampilkan demo atau stale evidence sebagai current.
+
+#### M-13 — Billing & Entitlement
+
+- **Alur wajib:** catalog → checkout → signature-verified webhook inbox →
+  subscription state → entitlement check → renewal/failure/cancel/refund →
+  reconciliation.
+- **Acceptance:** payment provider tidak pernah mengubah finding; duplicate/
+  out-of-order/replayed event aman; entitlement ditolak server-side dan
+  transparan; raw card data tidak disimpan; setiap transaksi dapat direkonsiliasi
+  dengan provider dan audit log.
+
+#### M-14 — AI Gateway & Assistants
+
+- **Alur wajib:** classify request → scoped retrieval → redact → model call →
+  schema validate/citation verify → answer/refusal → usage log → human approval
+  bila output normatif.
+- **Acceptance:** cross-tenant retrieval, prompt injection, unsupported/legal
+  claim, stale/integrity-failed evidence, dan insufficient evidence diuji;
+  citation harus dapat ditemukan; refusal tidak boleh menjadi jawaban optimistis;
+  fallback mempertahankan safety contract; AI tidak pernah menulis compliance
+  status, evidence, subscription, atau published policy.
+
+#### M-15 — Admin, Observability & Operations
+
+- **Alur wajib:** capability registry → release diff → deploy gate → observe SLO/
+  cost → incident → contain → recover → post-incident review.
+- **Acceptance:** operator dapat pause/resume queue, revoke integration, quarantine
+  evidence, replay notification, disable AI, restore backup, dan memverifikasi
+  checksum/migration/tenant/evidence reference tanpa mengubah histori; critical
+  alert, audit, backup/restore, dan runbook drill memiliki bukti timestamp.
 
 ---
 
@@ -1621,6 +1812,7 @@ hasil dengan sample data atau menampilkan optimistic score.
 |---|---|
 | 4.0 | Konsolidasi PRD master v3.0 dan Addendum Scan v1.0 menjadi baseline engineering tunggal; konflik status/evidence/path diselesaikan eksplisit. |
 | 5.0 | Kritik dan hardening evidence-first: provenance, freshness/coverage, immutable evidence, AI safety contract, tenant/API security, vertical-slice roadmap, operational runbooks, dan release gates. |
+| 5.1 | Penambahan peta readiness 15 modul utama, kontrak kelengkapan lintas modul, lifecycle/state machine, acceptance behavior, dan dependency gate agar `full feature` tidak disamakan dengan CRUD atau placeholder. |
 
 Perubahan besar terhadap keputusan final memerlukan RFC baru dan pembaruan versi
 dokumen ini. `/DOC/PRD-JOBEN-ENTERPRISE.md` tetap menjadi sumber kebenaran terbaru
